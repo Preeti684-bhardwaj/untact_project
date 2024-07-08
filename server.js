@@ -66,7 +66,7 @@ cluster(function(worker) {
 	app.use('/', router);
 	app.use(passport.initialize());
 	
-	const server = app.listen(19909, function () {
+	const server = app.listen(process.env.PORT || 18809, function () {
   		let host = server.address().address
   		let port = server.address().port
   		console.log("Workder listening at http://%s:%s", host, port); 
