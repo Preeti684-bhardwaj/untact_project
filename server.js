@@ -5,7 +5,6 @@ const express = require('express');
 let bodyParser = require('body-parser');
 
 const jwt = require('jsonwebtoken');
-
 const passport = require('passport');
 const passportJWT = require('passport-jwt');
 
@@ -15,37 +14,47 @@ let JwtStrategy = passportJWT.Strategy;
 let jwtOptions = {};
 jwtOptions.jwtFromRequest = ExtractJwt.fromAuthHeaderAsBearerToken();
 jwtOptions.secretOrKey = process.env.JWT_SECRET;
-jwtOptions.passReqToCallback= true;
+jwtOptions.passReqToCallback = true;
 
 const models = require('./models');
 const db = models.db; 
 
-let strategy = new JwtStrategy(jwtOptions, function(req,jwt_payload, done) {
-  console.log('payload received', jwt_payload);
-  var Model = jwt_payload.obj.type === 'AGENT' ? db.Agents : db.Admins;
+let strategy = new JwtStrategy(jwtOptions, function(req, jwt_payload, done) {
+    console.log('payload received', jwt_payload);
 
-   
-  Model.findOne({where: {id: jwt_payload.obj.obj.id}})
-	  .then( user =>{
-        if (user) {
-	   let obj ={
-		   type:jwt_payload.obj.type,
-		   obj:user
-	   };
-           return done(null,obj);
-        } else {
+    let Model;
+    switch (jwt_payload.obj.type) {
+        case 'AGENT':
+            Model = db.Agents;
+            break;
+        case 'ADMIN':
+            Model = db.Admins;
+            break;
+        case 'ORGANIZATION':
+            Model = db.Organizations;
+            break;
+        default:
             return done(null, false);
-        }
-    }).catch( error =>{
-	    return done(null, false);
-    });
+    }
 
+    Model.findOne({ where: { id: jwt_payload.obj.id } })
+        .then(user => {
+            if (user) {
+                let obj = {
+                    type: jwt_payload.obj.type,
+                    obj: user
+                };
+                return done(null, obj);
+            } else {
+                return done(null, false);
+            }
+        })
+        .catch(error => {
+            return done(null, false);
+        });
 });
-
-// use the strategy
-passport.use('jwt',strategy);
-
-
+// Use the strategy
+passport.use('jwt', strategy);
   
 // force: true will drop the table if it already exists
 db.sequelize.sync().then(() => {
@@ -66,7 +75,7 @@ cluster(function(worker) {
 	app.use('/', router);
 	app.use(passport.initialize());
 	
-	const server = app.listen(process.env.PORT || 18809, function () {
+	const server = app.listen(process.env.PORT || 17809, function () {
   		let host = server.address().address
   		let port = server.address().port
   		console.log("Workder listening at http://%s:%s", host, port); 

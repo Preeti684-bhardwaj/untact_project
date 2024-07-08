@@ -127,6 +127,7 @@ console.log(token);
     let decoded =jwt.verify(token, process.env.JWT_SECRET);
         req.userId = decoded.obj.id;
         req.userType = decoded.obj.type;
+        console.log(req.userType);
         next();
 } catch (error) {
     if (error.message == "Invalid token") {
@@ -152,5 +153,29 @@ exports.authorizeAdmin = async (req, res, next) => {
     }
 };
 
+exports.authorizeAdminOrOrganization = async (req, res, next) => {
+    const id = req.userId;
+    const type=req.userType;
+
+    if (type === 'ADMIN') {
+        const admin = await models.Admin.findByPk(req.userId);
+
+        if (!admin) {
+            return res.status(403).send({ message: 'You are not authorized to access this resource.' });
+        }
+        // If user is an admin, proceed
+        return next();
+    }
+
+    if (type === 'ORGANIZATION') {
+        // Check if the user is part of the organization
+        const organization = await models.Organization.findByPk(id);
+        if (organization) {
+            return next();
+        }
+    }
+
+    return res.status(403).json({ error: 'Not authorized' });
+};
 
 

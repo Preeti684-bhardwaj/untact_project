@@ -22,10 +22,10 @@ const models = {
 // Define relationships
 
 models.Organization.hasMany(models.JobCard, { as: 'jobCards' });
-models.JobCard.belongsTo(models.Organization,{foreignKey:'organizationId' , as : 'organization'});
+models.JobCard.belongsTo(models.Organization);
 
 models.Admin.hasMany(models.JobCard,{as:'jobCardsByAdmin'});
-models.JobCard.belongsTo(models.Admin,{foreignKey:'adminId' , as : 'admin'})
+models.JobCard.belongsTo(models.Admin)
 // models.Event.hasMany(models.ExhibitorBrand, { as: 'ExhibitorBrands' });
 // models.ExhibitorBrand.belongsTo(models.Event);
 
