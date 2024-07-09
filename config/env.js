@@ -1,10 +1,10 @@
 const env = {
-  // database: 'server',
-  // username: 'eventuser',
-  // password: 'eventuser123',
-  database: 'Untact',
-  username: 'postgres',
-  password: '987654',
+  database: 'untactserver',
+  username: 'untactuser',
+  password: 'untactuser123',
+  // database: 'Untact',
+  // username: 'postgres',
+  // password: '987654',
   host: 'localhost',
   dialect: 'postgres',
   pool: {
