@@ -1,5 +1,5 @@
 const env = {
-  // database: 'eventserver',
+  // database: 'server',
   // username: 'eventuser',
   // password: 'eventuser123',
   database: 'Untact',

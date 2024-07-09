@@ -7,13 +7,15 @@ const express = require('express');
 const agent=require('./Agent.router')
 const admin=require('./Admin.router')
 const organization=require('./Organization.router')
-const jobCard=require('./JobCard.router')
+const jobCard=require('./JobCard.router');
+const JobPost= require('./JobPost.router');
 const router = express.Router();
 
 router.use('/agent',agent)
 router.use('/admin',admin)
 router.use('/organization',organization)
 router.use('/jobCard',jobCard)
+router.use('/jobPost',JobPost)
 // router.use('/executive-assigned', executiveAssignedRouter);
 // router.use('/executive', executiveRouter);
 // router.use('/conference', conferenceRouter);
