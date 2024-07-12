@@ -19,6 +19,7 @@ class BaseController {
     this.router.put('/:id', this.update.bind(this));
     this.router.put('/updateByAdmin/:id',authenticate, authorizeAdmin, this.update.bind(this));
     this.router.delete('/:id', this.delete.bind(this));
+    this.router.delete('/deletedByAdmin/:id',authenticate, authorizeAdmin, this.delete.bind(this));
   }
 
   listArgVerify(req, res, queryOptions) {
@@ -206,7 +207,7 @@ class BaseController {
       });
 
       if (deleted) {
-        res.status(204).send();
+        res.status(204).send({message:`Deleted ${deleted}`});
       } else {
         res.status(404).json({ error: 'Item not found' });
       }
