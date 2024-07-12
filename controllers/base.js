@@ -207,7 +207,7 @@ class BaseController {
       });
 
       if (deleted) {
-        res.status(204).json({message:"item deleted"});
+       return res.status(204).json({message:"item deleted"});
       } else {
         res.status(404).json({ error: 'Item not found' });
       }
