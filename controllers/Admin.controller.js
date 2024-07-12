@@ -214,6 +214,7 @@ class AdminController extends BaseController {
           name: admin.name,
           email: admin.email,
           phone: admin.phone,
+          emailVerification:admin.IsEmailVerified
         },
       });
     } catch (error) {
