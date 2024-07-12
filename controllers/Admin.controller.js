@@ -15,6 +15,23 @@ const generateToken = (admin) => {
     expiresIn: "72h", // expires in 72 hours
   });
 };
+const generateOtp = () => {
+    // Define the possible characters for the OTP
+    const chars = "0123456789";
+    // Define the length of the OTP
+    const len = 6;
+    let otp = "";
+    // Generate the OTP
+    for (let i = 0; i < len; i++) {
+      otp += chars[Math.floor(Math.random() * chars.length)];
+    }
+  
+    this.otp = otp;
+    this.otpExpire = Date.now() + 15 * 60 * 1000;
+  
+    return otp;
+  };
+  
 
 class AdminController extends BaseController {
   constructor() {
