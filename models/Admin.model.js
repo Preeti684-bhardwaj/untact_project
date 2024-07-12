@@ -5,6 +5,7 @@ module.exports = (sequelize, DataTypes) => {
             primaryKey: true,
             defaultValue: DataTypes.UUIDV4
         },
+        name:DataTypes.STRING,
         email: {
             type: DataTypes.STRING,
             allowNull: false
@@ -14,6 +15,8 @@ module.exports = (sequelize, DataTypes) => {
             type: DataTypes.STRING,
             allowNull: false
         },
+        otp:DataTypes.STRING,
+        otpExpire:DataTypes.DATE,
         IsActivated: {
             type: DataTypes.BOOLEAN,
             defaultValue: false
