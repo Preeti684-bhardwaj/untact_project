@@ -2,6 +2,13 @@ const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const BaseController = require("./base");
 const models = require("../models");
+const {
+    isValidEmail,
+    isValidPhone,
+    isValidPassword,
+    isValidLength,
+  } = require("../utils/validation");
+  const sendEmail = require("../utils/sendEmail.js");
 const sequelize = require("../config/db.config").sequelize; // Ensure this path is correct
 const { authenticate, authorizeAdmin } = require("../controllers/auth");
 
@@ -10,6 +17,22 @@ const generateToken = (agent) => {
     expiresIn: "72h", // expires in 72 hours
   });
 };
+const generateOtp = () => {
+    // Define the possible characters for the OTP
+    const chars = "0123456789";
+    // Define the length of the OTP
+    const len = 6;
+    let otp = "";
+    // Generate the OTP
+    for (let i = 0; i < len; i++) {
+      otp += chars[Math.floor(Math.random() * chars.length)];
+    }
+  
+    this.otp = otp;
+    this.otpExpire = Date.now() + 15 * 60 * 1000;
+  
+    return otp;
+  };
 
 class AgentController extends BaseController {
   constructor() {
