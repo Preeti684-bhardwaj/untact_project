@@ -8,7 +8,7 @@ const {
   isValidPassword,
   isValidLength,
 } = require("../utils/validation");
-const sendEmail = require("../utils/sendEmail");
+const sendEmail = require("../utils/sendEmail.js");
 const sequelize = require("../config/db.config").sequelize; // Ensure this path is correct
 
 const generateToken = (admin) => {
