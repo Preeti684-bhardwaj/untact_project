@@ -243,7 +243,9 @@ class AdminController extends BaseController {
       if (!admin) {
         return res.status(404).send({ message: "Admin not found." });
       }
-
+if(!admin.isEmailVerified){
+    return res.status(400).send({ message: "admin is not verified" });
+}
       const isPasswordValid = await bcrypt.compare(password, admin.password);
       if (!isPasswordValid) {
         return res.status(403).send({ message: "Invalid password." });
