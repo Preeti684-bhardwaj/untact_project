@@ -314,7 +314,7 @@ class AdminController extends BaseController {
       if (!admin) {
         return res.status(404).send({ message: "Admin not found" });
       }
-      if (!admin.isEmailVerified) {
+      if (!admin.isEmailVer) {
         return res.status(404).send({ message: "Admin is not verified" });
       }
 
