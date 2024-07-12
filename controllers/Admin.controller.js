@@ -214,17 +214,15 @@ class AdminController extends BaseController {
           name: admin.name,
           email: admin.email,
           phone: admin.phone,
-          isEmailVerified:admin.isEmailVerified
+          isEmailVerified: admin.isEmailVerified,
         },
       });
     } catch (error) {
-      res
-        .status(500)
-        .json({
-          success: false,
-          message: "Server Error",
-          error: error.message,
-        });
+      res.status(500).json({
+        success: false,
+        message: "Server Error",
+        error: error.message,
+      });
     }
   };
 
@@ -243,9 +241,9 @@ class AdminController extends BaseController {
       if (!admin) {
         return res.status(404).send({ message: "Admin not found." });
       }
-if(!admin.isEmailVerified){
-    return res.status(400).send({ message: "admin is not verified" });
-}
+      if (!admin.isEmailVerified) {
+        return res.status(400).send({ message: "admin is not verified" });
+      }
       const isPasswordValid = await bcrypt.compare(password, admin.password);
       if (!isPasswordValid) {
         return res.status(403).send({ message: "Invalid password." });

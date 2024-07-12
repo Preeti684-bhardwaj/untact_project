@@ -22,6 +22,10 @@ module.exports = (sequelize, DataTypes) => {
             type: DataTypes.STRING,
             allowNull: false
         },
+        isEmailVerified: {
+            type: DataTypes.BOOLEAN,
+            defaultValue: false
+        },
         emailToken: DataTypes.STRING,
         createdAt: DataTypes.DATE,
         updatedAt: DataTypes.DATE

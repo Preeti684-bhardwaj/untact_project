@@ -5,6 +5,7 @@ module.exports = (sequelize, DataTypes) => {
             primaryKey: true,
             defaultValue: DataTypes.UUIDV4
         },
+        name:DataTypes.STRING,
         email: {
             type: DataTypes.STRING,
             allowNull: false
@@ -20,7 +21,7 @@ module.exports = (sequelize, DataTypes) => {
             type: DataTypes.BOOLEAN,
             defaultValue: false
         },
-        IsEmailVerified: {
+        isEmailVerified: {
             type: DataTypes.BOOLEAN,
             defaultValue: false
         },
