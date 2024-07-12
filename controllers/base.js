@@ -3,7 +3,7 @@ const axios = require('axios');
 const sequelize = db.sequelize;
 const express = require('express');
 const models = require('../models');
-
+const { authenticate, authorizeAdmin } = require("../controllers/auth");
 class BaseController {
   constructor(model) {
     this.model = model;
@@ -17,6 +17,7 @@ class BaseController {
     this.router.get('/:id', this.read.bind(this));
     this.router.post('/', this.create.bind(this));
     this.router.put('/:id', this.update.bind(this));
+    this.router.put('/updateByAdmin/:id',authenticate, authorizeAdmin, this.update.bind(this));
     this.router.delete('/:id', this.delete.bind(this));
   }
 
