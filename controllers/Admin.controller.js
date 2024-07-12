@@ -201,7 +201,7 @@ class AdminController extends BaseController {
       }
 
       // Update admin details
-      admin.IsEmailVerified = true;
+      admin.isEmailVerified = true;
       admin.otp = null;
       admin.otpExpire = null;
       await admin.save();
@@ -214,7 +214,7 @@ class AdminController extends BaseController {
           name: admin.name,
           email: admin.email,
           phone: admin.phone,
-          emailVerification:admin.IsEmailVerified
+          isEmailVerified:admin.isEmailVerified
         },
       });
     } catch (error) {
@@ -315,7 +315,7 @@ class AdminController extends BaseController {
         return res.status(404).send({ message: "Admin not found" });
       }
       if (!admin.isEmailVerified) {
-        return res.status(404).send({ message: "Admin is not verified" });
+        return res.status(400).send({ message: "Admin is not verified" });
       }
 
       // Get ResetPassword Token
