@@ -409,6 +409,9 @@ emailOtpVerification = async (req, res) => {
       if (!organization) {
         return res.status(404).send({ message: "Organization not found." });
       }
+      if (!organization.isEmailVerified) {
+        return res.status(400).send({ message: "agent is not verified" });
+      }
 
       const isPasswordValid = await bcrypt.compare(
         password,
