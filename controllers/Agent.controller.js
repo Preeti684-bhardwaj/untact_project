@@ -38,6 +38,7 @@ class AgentController extends BaseController {
   constructor() {
     super(models.Agent);
     this.router.post("/signup",authenticate,authorizeAdmin,this.signupByAdmin.bind(this));
+    this.router.post("/signupagent",this.signupByAgent.bind(this));
     this.router.post("/signin", this.signin.bind(this));
     this.router.get("/verify-email", this.verifyEmail.bind(this));
     this.router.post("/forgotPassword", this.forgotPassword.bind(this));
@@ -72,6 +73,108 @@ class AgentController extends BaseController {
     // Add additional setup after creating an agent, if necessary
   }
 
+  signupByAgent= async (req, res) => {
+    const transaction = await sequelize.transaction();
+    try {
+      const { name, email, phone, password } = req.body;
+
+      // Validate input fields
+      if (
+        [name, email, phone, password].some((field) => field?.trim() === "")
+      ) {
+        return res
+          .status(400)
+          .send({ message: "Please provide all necessary fields" });
+      }
+
+      if (!isValidPhone(phone)) {
+        return res.status(400).send({ message: "Invalid Phone Number" });
+      }
+
+      if (!isValidEmail(email)) {
+        return res.status(400).send({ message: "Invalid email" });
+      }
+
+      if (!isValidPassword(password)) {
+        return res.status(400).send({
+          message:
+            "Password must contain at least 8 characters, including uppercase, lowercase, number and special character",
+        });
+      }
+
+      if (!isValidLength(name)) {
+        return res.status(400).send({
+          message:
+            "Name should be greater than 3 characters and less than 40 characters and should not start with number",
+        });
+      }
+
+      const hashedPassword = await bcrypt.hash(password, 10);
+
+      // Check for existing agent by email or phone
+      const existingAgentByEmail = await models.Agent.findOne({
+        where: { email },
+      });
+      const existingAgentByPhone = await models.Agent.findOne({
+        where: { phone },
+      });
+      let agent;
+      if (existingAgentByEmail && existingAgentByPhone) {
+        // Both email and phone already exist
+        return res.status(400).send({
+          message: "either email and phone number are already in use",
+        });
+      }
+
+      if (existingAgentByEmail) {
+        if (existingAgentByPhone.isEmailVerified) {
+            return req.status(400).send({message:"agent already exists and is verified"});
+          }
+        // Email exists but phone doesn't match
+        if (existingAgentByEmail.phone !== phone) {
+          return res.status(400).send({
+            message: "phone already in use",
+          });
+        }
+        // Update existing agent
+        existingAgentByEmail.name = name;
+        existingAgentByEmail.password = hashedPassword;
+        await existingAgentByEmail.save({ transaction });
+        agent = existingAgentByEmail;
+      } else if (existingAgentByPhone) {
+        // Phone exists but email doesn't match
+        return res.status(400).send({
+          message: "Phone number already in use",
+        });
+      } else {
+        // Create new agent
+        const emailToken = generateToken({ email });
+        agent = await models.Agent.create(
+          {
+            name,
+            email,
+            phone,
+            password: hashedPassword,
+            emailToken,
+          },
+          { transaction }
+        );
+      }
+
+      await transaction.commit();
+      res.status(201).send({
+        id: agent.id,
+        email: agent.email,
+        phone: agent.phone,
+      });
+    } catch (error) {
+      await transaction.rollback();
+      res.status(500).send({
+        message: error.message || "Some error occurred during signup.",
+      });
+    }
+  };
+//   sign up by admin
   signupByAdmin = async (req, res) => {
     const transaction = await sequelize.transaction();
     try {
