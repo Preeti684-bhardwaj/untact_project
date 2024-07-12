@@ -3,11 +3,12 @@ const jwt = require("jsonwebtoken");
 const BaseController = require("./base");
 const models = require("../models");
 const {
-    isValidEmail,
-    isValidPhone,
-    isValidPassword,
-    isValidLength,
-  } = require("../utils/validation");
+  isValidEmail,
+  isValidPhone,
+  isValidPassword,
+  isValidLength,
+} = require("../utils/validation");
+const sendEmail = require("../utils/sendEmail");
 const sequelize = require("../config/db.config").sequelize; // Ensure this path is correct
 
 const generateToken = (admin) => {
@@ -16,22 +17,21 @@ const generateToken = (admin) => {
   });
 };
 const generateOtp = () => {
-    // Define the possible characters for the OTP
-    const chars = "0123456789";
-    // Define the length of the OTP
-    const len = 6;
-    let otp = "";
-    // Generate the OTP
-    for (let i = 0; i < len; i++) {
-      otp += chars[Math.floor(Math.random() * chars.length)];
-    }
-  
-    this.otp = otp;
-    this.otpExpire = Date.now() + 15 * 60 * 1000;
-  
-    return otp;
-  };
-  
+  // Define the possible characters for the OTP
+  const chars = "0123456789";
+  // Define the length of the OTP
+  const len = 6;
+  let otp = "";
+  // Generate the OTP
+  for (let i = 0; i < len; i++) {
+    otp += chars[Math.floor(Math.random() * chars.length)];
+  }
+
+  this.otp = otp;
+  this.otpExpire = Date.now() + 15 * 60 * 1000;
+
+  return otp;
+};
 
 class AdminController extends BaseController {
   constructor() {
@@ -42,8 +42,8 @@ class AdminController extends BaseController {
     this.router.post("/forgotPassword", this.forgotPassword.bind(this));
     this.router.post("/resetpassword/:userId", this.resetPassword.bind(this));
     this.router.post("/sendOtp", this.sendOtp.bind(this));
-    this.router.post("/otpVerification",this.emailOtpVerification.bind(this));
-}
+    this.router.post("/otpVerification", this.emailOtpVerification.bind(this));
+  }
 
   listArgVerify(req, res, queryOptions) {
     const { role, active } = req.body;
@@ -74,9 +74,9 @@ class AdminController extends BaseController {
   signup = async (req, res) => {
     const transaction = await sequelize.transaction(); // Use sequelize from the imported config
     try {
-      const { name,email, phone, password } = req.body;
-       // Validate input fields
-       if (
+      const { name, email, phone, password } = req.body;
+      // Validate input fields
+      if (
         [name, email, phone, password].some((field) => field?.trim() === "")
       ) {
         return res
@@ -130,56 +130,56 @@ class AdminController extends BaseController {
             message: "phone already in use",
           });
         }
-         // Update existing admin
-         existingAdminByEmail.name = name;
-         existingAdminByEmail.password = hashedPassword;
-         await existingAdminByEmail.save({ transaction });
-         admin = existingAdminByEmail;
-       } else if (existingAdminByPhone) {
-         // Phone exists but email doesn't match
-         return res.status(400).send({
-           message: "Phone number already in use",
-         });
-       } else {
-         // Create new admin
-         const emailToken = generateToken({ email });
-         admin = await models.Admin.create(
-           {
-             name,
-             email,
-             phone,
-             password: hashedPassword,
-             emailToken,
-           },
-           { transaction }
-         );
-       }
- 
-       await transaction.commit();
-       res.status(201).send({
-         id: admin.id,
-         email: admin.email,
-         phone: admin.phone,
-       });
-     } catch (error) {
-       await transaction.rollback();
-       res.status(500).send({
-         message: error.message || "Some error occurred during signup.",
-       });
-     }
-   };
+        // Update existing admin
+        existingAdminByEmail.name = name;
+        existingAdminByEmail.password = hashedPassword;
+        await existingAdminByEmail.save({ transaction });
+        admin = existingAdminByEmail;
+      } else if (existingAdminByPhone) {
+        // Phone exists but email doesn't match
+        return res.status(400).send({
+          message: "Phone number already in use",
+        });
+      } else {
+        // Create new admin
+        const emailToken = generateToken({ email });
+        admin = await models.Admin.create(
+          {
+            name,
+            email,
+            phone,
+            password: hashedPassword,
+            emailToken,
+          },
+          { transaction }
+        );
+      }
 
-   //   Email OTP verification
- emailOtpVerification =async (req, res) => {
-    const { phone, otp} = req.body;
-  
+      await transaction.commit();
+      res.status(201).send({
+        id: admin.id,
+        email: admin.email,
+        phone: admin.phone,
+      });
+    } catch (error) {
+      await transaction.rollback();
+      res.status(500).send({
+        message: error.message || "Some error occurred during signup.",
+      });
+    }
+  };
+
+  //   Email OTP verification
+  emailOtpVerification = async (req, res) => {
+    const { phone, otp } = req.body;
+
     // Validate the OTP
     if (!otp) {
       return res
         .status(400)
         .json({ success: false, message: "OTP is required." });
     }
-  
+
     try {
       const admin = await models.Admin.findOne({ where: { phone } });
       console.log(admin);
@@ -189,21 +189,23 @@ class AdminController extends BaseController {
           message: "Admin not found or invalid details.",
         });
       }
-  
+
       // Check OTP validity
       if (admin.otp !== otp) {
         return res.status(400).json({ success: false, message: "Invalid OTP" });
       }
       if (admin.otpExpire < Date.now()) {
-        return res.status(400).json({ success: false, message: "expired OTP." });
+        return res
+          .status(400)
+          .json({ success: false, message: "expired OTP." });
       }
-  
+
       // Update admin details
       admin.IsEmailVerified = true;
       admin.otp = null;
       admin.otpExpire = null;
       await admin.save();
-  
+
       res.status(201).json({
         success: true,
         message: "Admin data",
@@ -217,22 +219,24 @@ class AdminController extends BaseController {
     } catch (error) {
       res
         .status(500)
-        .json({ success: false, message: "Server Error", error: error.message });
+        .json({
+          success: false,
+          message: "Server Error",
+          error: error.message,
+        });
     }
   };
 
   signin = async (req, res) => {
     const { email, password } = req.body;
-    if (
-        [ email,password].some((field) => field?.trim() === "")
-      ) {
-        return res
-          .status(400)
-          .send({ message: "Please provide all necessary fields" });
-      }
-      if (!email || !password) {
-        return res.status(400).send({ message: "Please Enter Email & Password" });
-      }
+    if ([email, password].some((field) => field?.trim() === "")) {
+      return res
+        .status(400)
+        .send({ message: "Please provide all necessary fields" });
+    }
+    if (!email || !password) {
+      return res.status(400).send({ message: "Please Enter Email & Password" });
+    }
     try {
       const admin = await models.Admin.findOne({ where: { email } });
       if (!admin) {
@@ -243,7 +247,7 @@ class AdminController extends BaseController {
       if (!isPasswordValid) {
         return res.status(403).send({ message: "Invalid password." });
       }
-    //   console.log(admin.id);
+      //   console.log(admin.id);
       const obj = {
         type: "ADMIN",
         id: admin.id,
@@ -285,8 +289,8 @@ class AdminController extends BaseController {
       });
     }
   };
- // forget password
- forgotPassword = async (req, res) => {
+  // forget password
+  forgotPassword = async (req, res) => {
     const { email } = req.body;
 
     // Validate input fields
@@ -309,9 +313,9 @@ class AdminController extends BaseController {
       if (!admin) {
         return res.status(404).send({ message: "Admin not found" });
       }
-        if (!admin.isEmailVerified) {
-          return res.status(404).send({message:"Admin is not verified"});
-        }
+      if (!admin.isEmailVerified) {
+        return res.status(404).send({ message: "Admin is not verified" });
+      }
 
       // Get ResetPassword Token
       const otp = generateOtp(); // Assuming you have a method to generate the OTP
@@ -448,7 +452,6 @@ class AdminController extends BaseController {
       return res.status(500).send(error.message);
     }
   };
-
 }
 
 module.exports = new AdminController();
