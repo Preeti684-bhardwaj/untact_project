@@ -40,7 +40,7 @@ class AdminController extends BaseController {
     this.router.post("/signin", this.signin.bind(this));
     this.router.get("/verify-email", this.verifyEmail.bind(this));
     this.router.post("/forgotPassword", this.forgotPassword.bind(this));
-    this.router.post("/resetpassword/:userId", this.resetPassword.bind(this));
+    this.router.post("/resetpassword/:adminId", this.resetPassword.bind(this));
     this.router.post("/sendOtp", this.sendOtp.bind(this));
     this.router.post("/otpVerification", this.emailOtpVerification.bind(this));
   }
