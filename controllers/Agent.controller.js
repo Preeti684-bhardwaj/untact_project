@@ -14,12 +14,7 @@ const generateToken = (agent) => {
 class AgentController extends BaseController {
   constructor() {
     super(models.Agent);
-    this.router.post(
-      "/signup",
-      authenticate,
-      authorizeAdmin,
-      this.signup.bind(this)
-    );
+    this.router.post("/signup",authenticate,authorizeAdmin,this.signup.bind(this));
     this.router.post("/signin", this.signin.bind(this));
     this.router.get("/verify-email", this.verifyEmail.bind(this));
     this.router.post("/forgotPassword", this.forgotPassword.bind(this));
@@ -131,6 +126,7 @@ class AgentController extends BaseController {
             phone,
             password: hashedPassword,
             emailToken,
+            isEmailVerified: true,
           },
           { transaction }
         );
@@ -141,6 +137,7 @@ class AgentController extends BaseController {
         id: agent.id,
         email: agent.email,
         phone: agent.phone,
+        isEmailVerified: agent.isEmailVerified, 
       });
     } catch (error) {
       await transaction.rollback();
