@@ -466,6 +466,7 @@ class AgentController extends BaseController {
         .status(400)
         .send({ message: "Missing required fields: password or OTP" });
     }
+    const hashedPassword = await bcrypt.hash(password, 10);
 
     try {
       // Find the agent by ID
@@ -484,7 +485,7 @@ class AgentController extends BaseController {
       }
 
       // Update the agent's password and clear OTP fields
-      agent.password = password;
+      agent.password = hashedPassword;
       agent.otp = null;
       agent.otpExpire = null;
 

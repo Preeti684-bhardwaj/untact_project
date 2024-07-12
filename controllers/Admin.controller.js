@@ -358,7 +358,7 @@ class AdminController extends BaseController {
         .status(400)
         .send({ message: "Missing required fields: password or OTP" });
     }
-
+    const hashedPassword = await bcrypt.hash(password, 10);
     try {
       // Find the admin by ID
       const admin = await models.Admin.findByPk(adminId);
@@ -376,7 +376,7 @@ class AdminController extends BaseController {
       }
 
       // Update the admin's password and clear OTP fields
-      admin.password = password;
+      admin.password = hashedPassword;
       admin.otp = null;
       admin.otpExpire = null;
 

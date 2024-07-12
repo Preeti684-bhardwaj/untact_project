@@ -529,7 +529,7 @@ emailOtpVerification = async (req, res) => {
         .status(400)
         .send({ message: "Missing required fields: password or OTP" });
     }
-
+    const hashedPassword = await bcrypt.hash(password, 10);
     try {
       // Find the organization by ID
       const organization = await models.Organization.findByPk(organizationId);
@@ -547,7 +547,7 @@ emailOtpVerification = async (req, res) => {
       }
 
       // Update the organization's password and clear OTP fields
-      organization.password = password;
+      organization.password = hashedPassword;
       organization.otp = null;
       organization.otpExpire = null;
 
