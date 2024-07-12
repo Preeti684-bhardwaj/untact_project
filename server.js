@@ -57,8 +57,8 @@ let strategy = new JwtStrategy(jwtOptions, function(req, jwt_payload, done) {
 passport.use('jwt', strategy);
   
 // force: true will drop the table if it already exists
-db.sequelize.sync({ alter: true }).then(() => {
-	console.log('Database synchronized with alter: true');
+db.sequelize.sync({ force: true }).then(() => {
+	console.log('Database synchronized');
   });
 
 let router = require('./routers/index.js');
