@@ -185,7 +185,9 @@ class BaseController {
       });
 
       if (updated) {
-        const updatedItem = await this.model.findByPk(id);
+        const updatedItem = await this.model.findByPk(id, {
+          attributes: { exclude: ['password'] }
+        });
         res.json(updatedItem);
       } else {
         res.status(404).json({ error: 'Item not found' });
