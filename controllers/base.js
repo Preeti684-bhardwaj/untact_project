@@ -101,6 +101,7 @@ class BaseController {
       const results = await this.model.findAndCountAll({
         limit: limit,
         offset: offset,
+        attributes: { exclude: ['password'] },
         order: [['id', 'ASC']],
       });
 
@@ -118,7 +119,9 @@ class BaseController {
   async read(req, res) {
     try {
       const id = req.params.id;
-      const item = await this.model.findByPk(id);
+      const item = await this.model.findByPk(id, {
+        attributes: { exclude: ['password'] }
+      });
       if (!item) {
         res.status(404).json({ error: 'Item not found' });
       } else {
