@@ -37,7 +37,7 @@ const generateOtp = () => {
 class AgentController extends BaseController {
   constructor() {
     super(models.Agent);
-    this.router.post("/signup",authenticate,authorizeAdmin,this.signup.bind(this));
+    this.router.post("/signup",authenticate,authorizeAdmin,this.signupByAdmin.bind(this));
     this.router.post("/signin", this.signin.bind(this));
     this.router.get("/verify-email", this.verifyEmail.bind(this));
     this.router.post("/forgotPassword", this.forgotPassword.bind(this));
