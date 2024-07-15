@@ -109,62 +109,120 @@ class AdminController extends BaseController {
       const hashedPassword = await bcrypt.hash(password, 10);
 
       // Check for existing admin by email or phone
-      const existingAdminByEmail = await models.Admin.findOne({
-        where: { email },
-      });
-      const existingAdminByPhone = await models.Admin.findOne({
-        where: { phone },
-      });
-      let admin;
-      if (existingAdminByEmail && existingAdminByPhone) {
-        // Both email and phone already exist
-        return res.status(400).send({
-          message: "either email and phone number are already in use",
-        });
+      //       const existingAdminByEmail = await models.Admin.findOne({
+      //         where: { email },
+      //       });
+      //       const existingAdminByPhone = await models.Admin.findOne({
+      //         where: { phone },
+      //       });
+      //       let admin;
+      //       if (existingAdminByEmail && existingAdminByPhone) {
+      //         // Both email and phone already exist
+      //         return res.status(400).send({
+      //           message: "either email and phone number are already in use",
+      //         });
+      //       }
+
+      //       if (existingAdminByEmail) {
+      //         // Email exists but phone doesn't match
+      //         if (existingAdminByEmail.phone !== phone) {
+      //           return res.status(400).send({
+      //             message: "phone already in use",
+      //           });
+      //         }
+      //         // Update existing admin
+      //         existingAdminByEmail.name = name;
+      //         existingAdminByEmail.password = hashedPassword;
+      //         await existingAdminByEmail.save({ transaction });
+      //         admin = existingAdminByEmail;
+      //       } else if (existingAdminByPhone) {
+      //         // Phone exists but email doesn't match
+      //         return res.status(400).send({
+      //           message: "Phone number already in use",
+      //         });
+      //       } else {
+      //         // Create new admin
+      //         const emailToken = generateToken({ email });
+      //         admin = await models.Admin.create(
+      //           {
+      //             name,
+      //             email,
+      //             phone,
+      //             password: hashedPassword,
+      //             emailToken,
+      //           },
+      //           { transaction }
+      //         );
+      //       }
+
+      //       await transaction.commit();
+      //       res.status(201).send({
+      //         id: admin.id,
+      //         email: admin.email,
+      //         phone: admin.phone,
+      //       });
+      //     } catch (error) {
+      //       await transaction.rollback();
+      //       res.status(500).send({
+      //         message: error.message || "Some error occurred during signup.",
+      //       });
+      //     }
+      //   };
+      const existingAdmin = await models.Admin.findOne(
+        {
+          where: {
+            [sequelize.Op.or]: [{ email: email.toLowerCase() }, { phone }],
+          },
+        },
+        { transaction }
+      );
+
+      if (existingAdmin) {
+        await transaction.rollback();
+        if (
+          existingAdmin.email.toLowerCase() === email.toLowerCase() &&
+          existingAdmin.phone === phone
+        ) {
+          return res
+            .status(400)
+            .send({
+              message: "Both email and phone number are already in use",
+            });
+        } else if (existingAdmin.email.toLowerCase() === email.toLowerCase()) {
+          return res.status(400).send({ message: "Email already in use" });
+        } else {
+          return res
+            .status(400)
+            .send({ message: "Phone number already in use" });
+        }
       }
 
-      if (existingAdminByEmail) {
-        // Email exists but phone doesn't match
-        if (existingAdminByEmail.phone !== phone) {
-          return res.status(400).send({
-            message: "phone already in use",
-          });
-        }
-        // Update existing admin
-        existingAdminByEmail.name = name;
-        existingAdminByEmail.password = hashedPassword;
-        await existingAdminByEmail.save({ transaction });
-        admin = existingAdminByEmail;
-      } else if (existingAdminByPhone) {
-        // Phone exists but email doesn't match
-        return res.status(400).send({
-          message: "Phone number already in use",
-        });
-      } else {
-        // Create new admin
-        const emailToken = generateToken({ email });
-        admin = await models.Admin.create(
-          {
-            name,
-            email,
-            phone,
-            password: hashedPassword,
-            emailToken,
-          },
-          { transaction }
-        );
-      }
+      // If no existing admin, create a new one
+      const emailToken = generateToken({ email: email.toLowerCase() });
+
+      const newAdmin = await models.Admin.create(
+        {
+          name,
+          email: email.toLowerCase(),
+          phone,
+          password: hashedPassword,
+          emailToken,
+        },
+        { transaction }
+      );
 
       await transaction.commit();
+
       res.status(201).send({
-        id: admin.id,
-        email: admin.email,
-        phone: admin.phone,
+        id: newAdmin.id,
+        email: newAdmin.email,
+        phone: newAdmin.phone,
       });
     } catch (error) {
-      await transaction.rollback();
+      console.error("Signup error:", error);
+      if (transaction) await transaction.rollback();
       res.status(500).send({
-        message: error.message || "Some error occurred during signup.",
+        message: "An error occurred during signup. Please try again later.",
       });
     }
   };
