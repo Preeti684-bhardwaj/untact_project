@@ -10,8 +10,17 @@ const isValidEmail = email => validator.isEmail(email);
 const isValidPhone = (phone) => validator.isMobilePhone(phone, "en-IN");
 
 const isValidPassword = (password) => PASSWORD_REGEX.test(password)
+const isValidLength = (name) => {
+    // Regex explanation:
+    // ^[A-Za-z]   : Start with a letter
+    // [A-Za-z]*   : Followed by zero or more letters
+    // $           : End of string
+    // Length check: Between 4 and 40 characters
+    const nameRegex = /^[A-Za-z]{4,40}$/;
+    return nameRegex.test(name);
+  };
 
-const isValidLength = name => name.length >= 4 && name.length<=40 && !/^\d/.test(name)
+// const isValidLength = name => name.length >= 4 && name.length<=40 && !/^\d/.test(name)
 
 // const isDateGreterThanToday = date => moment(date).isSameOrAfter(today, "day");
 
