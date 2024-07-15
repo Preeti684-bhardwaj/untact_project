@@ -72,8 +72,11 @@ class AdminController extends BaseController {
   }
 
   signup = async (req, res) => {
-    const transaction = await sequelize.transaction(); // Use sequelize from the imported config
+    let transaction;
     try {
+        transaction = await sequelize.transaction({
+            timeout: 30000 // 30 seconds timeout
+        });// Use sequelize from the imported config
       const { name, email, phone, password } = req.body;
       // Validate input fields
       if (
