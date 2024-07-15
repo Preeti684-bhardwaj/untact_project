@@ -15,6 +15,7 @@ class JobPostController extends BaseController {
       authorizeAdminOrOrganization,
       this.create.bind(this)
     );
+    this.router.get("/getAllJobPost",this.getAllJobPostByOrganizationId.bind(this));
   }
 
   listArgVerify(req, res, queryOptions) {
@@ -24,17 +25,17 @@ class JobPostController extends BaseController {
   async afterCreate(req, res, newJobPost, transaction) {
     // Create JobCards associated with the new JobPost
     const jobCards = req.body.jobCards || [];
-    const jobCardPromises = jobCards.map(async jobCardData => {
+    const jobCardPromises = jobCards.map(async (jobCardData) => {
       const newJobCardData = {
-        job_title:newJobPost.job_title,
-        job_description:newJobPost.job_description,
+        job_title: newJobPost.job_title,
+        job_description: newJobPost.job_description,
         customerDetail: jobCardData,
         priority: newJobPost.priority,
         due_date: newJobPost.due_date,
-        status: newJobPost.status || 'Open',
+        status: newJobPost.status || "Open",
         JobPostId: newJobPost.id,
-        OrganizationId:newJobPost.OrganizationId,
-        AdminId:newJobPost.AdminId
+        OrganizationId: newJobPost.OrganizationId,
+        AdminId: newJobPost.AdminId,
       };
       return models.JobCard.create(newJobCardData, { transaction });
     });
@@ -58,9 +59,13 @@ class JobPostController extends BaseController {
       } else if (req.userType === "ADMIN") {
         if (!organizationId) {
           await transaction.rollback();
-          return res.status(400).json({ error: "Please provide organizationId" });
+          return res
+            .status(400)
+            .json({ error: "Please provide organizationId" });
         }
-        const existingOrganization = await models.Organization.findOne({ where: { id: organizationId } });
+        const existingOrganization = await models.Organization.findOne({
+          where: { id: organizationId },
+        });
         if (!existingOrganization) {
           await transaction.rollback();
           return res.status(404).json({ error: "Organization not found" });
@@ -82,6 +87,38 @@ class JobPostController extends BaseController {
       res.status(400).json({ error: error.message });
     }
   }
+  getAllJobPostByOrganizationId = async (req, res) => {
+    try {
+      const organizationId = req.params.organizationId;
+      if (!organizationId) {
+        return res.status(400).json({ message: "Organization ID is required" });
+      }
+      const page = parseInt(req.query.page, 10) || 1;
+      const limit = parseInt(req.query.limit, 10) || 10;
+      const offset = (page - 1) * limit;
+
+      const jobPost = await models.Organization.findAndCountAll({
+        where: {
+          organizationId: organizationId,
+        },
+        limit: limit,
+        offset: offset,
+        attributes: { exclude: ["password"] },
+        order: [["id", "ASC"]],
+      });
+      if (!jobPost) {
+        return res.status(404).json({ message: "Job Post not found" });
+      }
+      res.json({
+        data: jobPost.rows,
+        total: jobPost.count,
+        totalPages: Math.ceil(jobPost.count / limit),
+        currentPage: page,
+      });
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  };
 }
 
 module.exports = new JobPostController();
