@@ -3,12 +3,13 @@ const jwt = require("jsonwebtoken");
 const BaseController = require("./base");
 const models = require("../models");
 const {
-    isValidEmail,
-    isValidPhone,
-    isValidPassword,
-    isValidLength,
-  } = require("../utils/validation");
-  const sendEmail = require("../utils/sendEmail.js");
+  isValidEmail,
+  isValidPhone,
+  isValidPassword,
+  isValidLength,
+} = require("../utils/validation");
+const sendEmail = require("../utils/sendEmail.js");
+const { Op } = require("sequelize");
 const sequelize = require("../config/db.config").sequelize; // Ensure this path is correct
 const { authenticate, authorizeAdmin } = require("../controllers/auth");
 
@@ -18,27 +19,32 @@ const generateToken = (agent) => {
   });
 };
 const generateOtp = () => {
-    // Define the possible characters for the OTP
-    const chars = "0123456789";
-    // Define the length of the OTP
-    const len = 6;
-    let otp = "";
-    // Generate the OTP
-    for (let i = 0; i < len; i++) {
-      otp += chars[Math.floor(Math.random() * chars.length)];
-    }
-  
-    this.otp = otp;
-    this.otpExpire = Date.now() + 15 * 60 * 1000;
-  
-    return otp;
-  };
+  // Define the possible characters for the OTP
+  const chars = "0123456789";
+  // Define the length of the OTP
+  const len = 6;
+  let otp = "";
+  // Generate the OTP
+  for (let i = 0; i < len; i++) {
+    otp += chars[Math.floor(Math.random() * chars.length)];
+  }
+
+  this.otp = otp;
+  this.otpExpire = Date.now() + 15 * 60 * 1000;
+
+  return otp;
+};
 
 class AgentController extends BaseController {
   constructor() {
     super(models.Agent);
-    this.router.post("/signup",authenticate,authorizeAdmin,this.signupByAdmin.bind(this));
-    this.router.post("/signupagent",this.signupByAgent.bind(this));
+    this.router.post(
+      "/signup",
+      authenticate,
+      authorizeAdmin,
+      this.signupByAdmin.bind(this)
+    );
+    this.router.post("/signupagent", this.signupByAgent.bind(this));
     this.router.post("/signin", this.signin.bind(this));
     this.router.get("/verify-email", this.verifyEmail.bind(this));
     this.router.post("/forgotPassword", this.forgotPassword.bind(this));
@@ -73,7 +79,7 @@ class AgentController extends BaseController {
     // Add additional setup after creating an agent, if necessary
   }
 
-  signupByAgent= async (req, res) => {
+  signupByAgent = async (req, res) => {
     const transaction = await sequelize.transaction();
     try {
       const { name, email, phone, password } = req.body;
@@ -112,69 +118,128 @@ class AgentController extends BaseController {
       const hashedPassword = await bcrypt.hash(password, 10);
 
       // Check for existing agent by email or phone
-      const existingAgentByEmail = await models.Agent.findOne({
-        where: { email },
-      });
-      const existingAgentByPhone = await models.Agent.findOne({
-        where: { phone },
-      });
-      let agent;
-      if (existingAgentByEmail && existingAgentByPhone) {
-        // Both email and phone already exist
-        return res.status(400).send({
-          message: "either email and phone number are already in use",
-        });
+      //       const existingAgentByEmail = await models.Agent.findOne({
+      //         where: { email },
+      //       });
+      //       const existingAgentByPhone = await models.Agent.findOne({
+      //         where: { phone },
+      //       });
+      //       let agent;
+      //       if (existingAgentByEmail && existingAgentByPhone) {
+      //         // Both email and phone already exist
+      //         return res.status(400).send({
+      //           message: "either email and phone number are already in use",
+      //         });
+      //       }
+
+      //       if (existingAgentByEmail) {
+      //         if (existingAgentByPhone.isEmailVerified) {
+      //             return req.status(400).send({message:"agent already exists and is verified"});
+      //           }
+      //         // Email exists but phone doesn't match
+      //         if (existingAgentByEmail.phone !== phone) {
+      //           return res.status(400).send({
+      //             message: "phone already in use",
+      //           });
+      //         }
+      //         // Update existing agent
+      //         existingAgentByEmail.name = name;
+      //         existingAgentByEmail.password = hashedPassword;
+      //         await existingAgentByEmail.save({ transaction });
+      //         agent = existingAgentByEmail;
+      //       } else if (existingAgentByPhone) {
+      //         // Phone exists but email doesn't match
+      //         return res.status(400).send({
+      //           message: "Phone number already in use",
+      //         });
+      //       } else {
+      //         // Create new agent
+      //         const emailToken = generateToken({ email });
+      //         agent = await models.Agent.create(
+      //           {
+      //             name,
+      //             email,
+      //             phone,
+      //             password: hashedPassword,
+      //             emailToken,
+      //           },
+      //           { transaction }
+      //         );
+      //       }
+
+      //       await transaction.commit();
+      //       res.status(201).send({
+      //         id: agent.id,
+      //         email: agent.email,
+      //         phone: agent.phone,
+      //       });
+      //     } catch (error) {
+      //       await transaction.rollback();
+      //       res.status(500).send({
+      //         message: error.message || "Some error occurred during signup.",
+      //       });
+      //     }
+      //   };
+      const existingAgent = await models.Agent.findOne(
+        {
+          where: {
+            [Op.or]: [{ email: email.toLowerCase() }, { phone }],
+          },
+        },
+        { transaction }
+      );
+
+      if (existingAgent) {
+        await transaction.rollback();
+        if (
+          existingAgent.email.toLowerCase() === email.toLowerCase() &&
+          existingAgent.phone === phone
+        ) {
+          return res
+            .status(400)
+            .send({
+              message: "Both email and phone number are already in use",
+            });
+        } else if (existingAgent.email.toLowerCase() === email.toLowerCase()) {
+          return res.status(400).send({ message: "Email already in use" });
+        } else {
+          return res
+            .status(400)
+            .send({ message: "Phone number already in use" });
+        }
       }
 
-      if (existingAgentByEmail) {
-        if (existingAgentByPhone.isEmailVerified) {
-            return req.status(400).send({message:"agent already exists and is verified"});
-          }
-        // Email exists but phone doesn't match
-        if (existingAgentByEmail.phone !== phone) {
-          return res.status(400).send({
-            message: "phone already in use",
-          });
-        }
-        // Update existing agent
-        existingAgentByEmail.name = name;
-        existingAgentByEmail.password = hashedPassword;
-        await existingAgentByEmail.save({ transaction });
-        agent = existingAgentByEmail;
-      } else if (existingAgentByPhone) {
-        // Phone exists but email doesn't match
-        return res.status(400).send({
-          message: "Phone number already in use",
-        });
-      } else {
-        // Create new agent
-        const emailToken = generateToken({ email });
-        agent = await models.Agent.create(
-          {
-            name,
-            email,
-            phone,
-            password: hashedPassword,
-            emailToken,
-          },
-          { transaction }
-        );
-      }
+      // If no existing admin, create a new one
+      const emailToken = generateToken({ email: email.toLowerCase() });
+
+      const newAgent = await models.Agent.create(
+        {
+          name,
+          email: email.toLowerCase(),
+          phone,
+          password: hashedPassword,
+          emailToken,
+        },
+        { transaction }
+      );
 
       await transaction.commit();
+
       res.status(201).send({
-        id: agent.id,
-        email: agent.email,
-        phone: agent.phone,
+        id: newAgent.id,
+        email: newAgent.email,
+        phone: newAgent.phone,
       });
     } catch (error) {
-      await transaction.rollback();
+      console.error("Signup error:", error);
+      if (transaction) await transaction.rollback();
       res.status(500).send({
-        message: error.message || "Some error occurred during signup.",
+        message: "An error occurred during signup. Please try again later.",
       });
     }
   };
-//   sign up by admin
+
+  //   sign up by admin
   signupByAdmin = async (req, res) => {
     const transaction = await sequelize.transaction();
     try {
@@ -211,64 +276,124 @@ class AgentController extends BaseController {
 
       const hashedPassword = await bcrypt.hash(password, 10);
       // Check for existing agent by email or phone
-      const existingAgentByEmail = await models.Agent.findOne({
-        where: { email },
-      });
-      const existingAgentByPhone = await models.Agent.findOne({
-        where: { phone },
-      });
-      let agent;
-      if (existingAgentByEmail && existingAgentByPhone) {
-        // Both email and phone already exist
-        return res.status(400).send({
-          message: "either email and phone number are already in use",
-        });
+      //       const existingAgentByEmail = await models.Agent.findOne({
+      //         where: { email },
+      //       });
+      //       const existingAgentByPhone = await models.Agent.findOne({
+      //         where: { phone },
+      //       });
+      //       let agent;
+      //       if (existingAgentByEmail && existingAgentByPhone) {
+      //         // Both email and phone already exist
+      //         return res.status(400).send({
+      //           message: "either email and phone number are already in use",
+      //         });
+      //       }
+
+      //       if (existingAgentByEmail) {
+      //         // Email exists but phone doesn't match
+      //         if (existingAgentByEmail.phone !== phone) {
+      //           return res.status(400).send({
+      //             message: "phone already in use",
+      //           });
+      //         }
+      //         // Update existing agent
+      //         existingAgentByEmail.name = name;
+      //         existingAgentByEmail.password = hashedPassword;
+      //         await existingAgentByEmail.save({ transaction });
+      //         agent = existingAgentByEmail;
+      //       } else if (existingAgentByPhone) {
+      //         // Phone exists but email doesn't match
+      //         return res.status(400).send({
+      //           message: "Phone number already in use",
+      //         });
+      //       } else {
+      //         // Create new agent
+      //         const emailToken = generateToken({ email });
+      //         agent = await models.Agent.create(
+      //           {
+      //             name,
+      //             email,
+      //             phone,
+      //             password: hashedPassword,
+      //             emailToken,
+      //             isEmailVerified: true,
+      //           },
+      //           { transaction }
+      //         );
+      //       }
+
+      //       await transaction.commit();
+      //       res.status(201).send({
+      //         id: agent.id,
+      //         email: agent.email,
+      //         phone: agent.phone,
+      //         isEmailVerified: agent.isEmailVerified,
+      //       });
+      //     } catch (error) {
+      //       await transaction.rollback();
+      //       res.status(500).send({
+      //         message: error.message || "Some error occurred during signup.",
+      //       });
+      //     }
+      //   };
+      const existingAgent = await models.Agent.findOne(
+        {
+          where: {
+            [Op.or]: [{ email: email.toLowerCase() }, { phone }],
+          },
+        },
+        { transaction }
+      );
+
+      if (existingAgent) {
+        await transaction.rollback();
+        if (
+          existingAgent.email.toLowerCase() === email.toLowerCase() &&
+          existingAgent.phone === phone
+        ) {
+          return res
+            .status(400)
+            .send({
+              message: "Both email and phone number are already in use",
+            });
+        } else if (existingAgent.email.toLowerCase() === email.toLowerCase()) {
+          return res.status(400).send({ message: "Email already in use" });
+        } else {
+          return res
+            .status(400)
+            .send({ message: "Phone number already in use" });
+        }
       }
 
-      if (existingAgentByEmail) {
-        // Email exists but phone doesn't match
-        if (existingAgentByEmail.phone !== phone) {
-          return res.status(400).send({
-            message: "phone already in use",
-          });
-        }
-        // Update existing agent
-        existingAgentByEmail.name = name;
-        existingAgentByEmail.password = hashedPassword;
-        await existingAgentByEmail.save({ transaction });
-        agent = existingAgentByEmail;
-      } else if (existingAgentByPhone) {
-        // Phone exists but email doesn't match
-        return res.status(400).send({
-          message: "Phone number already in use",
-        });
-      } else {
-        // Create new agent
-        const emailToken = generateToken({ email });
-        agent = await models.Agent.create(
-          {
-            name,
-            email,
-            phone,
-            password: hashedPassword,
-            emailToken,
-            isEmailVerified: true,
-          },
-          { transaction }
-        );
-      }
+      // If no existing admin, create a new one
+      const emailToken = generateToken({ email: email.toLowerCase() });
+
+      const newAgent = await models.Agent.create(
+        {
+          name,
+          email: email.toLowerCase(),
+          phone,
+          password: hashedPassword,
+          emailToken,
+          isEmailVerified: true,
+        },
+        { transaction }
+      );
 
       await transaction.commit();
+
       res.status(201).send({
-        id: agent.id,
-        email: agent.email,
-        phone: agent.phone,
-        isEmailVerified: agent.isEmailVerified, 
+        id: newAgent.id,
+        email: newAgent.email,
+        phone: newAgent.phone,
+        isEmailVerified: newAgent.isEmailVerified,
       });
     } catch (error) {
-      await transaction.rollback();
+      console.error("Signup error:", error);
+      if (transaction) await transaction.rollback();
       res.status(500).send({
-        message: error.message || "Some error occurred during signup.",
+        message: "An error occurred during signup. Please try again later.",
       });
     }
   };
@@ -318,31 +443,28 @@ class AgentController extends BaseController {
           name: agent.name,
           email: agent.email,
           phone: agent.phone,
-          isEmailVerified:agent.isEmailVerified
+          isEmailVerified: agent.isEmailVerified,
         },
       });
     } catch (error) {
-      res
-        .status(500)
-        .json({
-          success: false,
-          message: "Server Error",
-          error: error.message,
-        });
+      res.status(500).json({
+        success: false,
+        message: "Server Error",
+        error: error.message,
+      });
     }
   };
 
-     
   signin = async (req, res) => {
     const { email, password } = req.body;
     if ([email, password].some((field) => field?.trim() === "")) {
-        return res
-          .status(400)
-          .send({ message: "Please provide all necessary fields" });
-      }
-      if (!email || !password) {
-        return res.status(400).send({ message: "Please Enter Email & Password" });
-      }
+      return res
+        .status(400)
+        .send({ message: "Please provide all necessary fields" });
+    }
+    if (!email || !password) {
+      return res.status(400).send({ message: "Please Enter Email & Password" });
+    }
     try {
       const agent = await models.Agent.findOne({ where: { email } });
       if (!agent) {
@@ -562,9 +684,6 @@ class AgentController extends BaseController {
       return res.status(500).send(error.message);
     }
   };
-  
 }
-
-
 
 module.exports = new AgentController();

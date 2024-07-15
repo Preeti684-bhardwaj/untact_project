@@ -9,7 +9,7 @@ const {
   isValidLength,
 } = require("../utils/validation");
 const sendEmail = require("../utils/sendEmail.js");
-const { Sequelize, Op } = require('sequelize');
+const { Op } = require('sequelize');
 const sequelize = require("../config/db.config").sequelize; // Ensure this path is correct
 
 const generateToken = (admin) => {

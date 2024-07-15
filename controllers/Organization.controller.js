@@ -9,6 +9,7 @@ const {
   isValidLength,
 } = require("../utils/validation");
 const sendEmail = require("../utils/sendEmail.js");
+const { Op } = require("sequelize");
 const sequelize = require("../config/db.config").sequelize; // Ensure this path is correct
 const { authenticate, authorizeAdmin } = require("../controllers/auth");
 
@@ -83,7 +84,7 @@ class OrganizationController extends BaseController {
   async afterCreate(req, res, newObject, transaction) {
     // Add additional setup after creating an organization, if necessary
   }
-  signupByOrganization=async(req,res)=>{
+  signupByOrganization = async (req, res) => {
     const transaction = await sequelize.transaction();
     try {
       const {
@@ -143,70 +144,133 @@ class OrganizationController extends BaseController {
       const hashedPassword = await bcrypt.hash(password, 10);
 
       // Check for existing organization by email or phone
-      const existingOrganizationByEmail = await models.Organization.findOne({
-        where: { email },
-      });
-      const existingOrganizationByPhone = await models.Organization.findOne({
-        where: { phone },
-      });
-      let organization;
-      if (existingOrganizationByEmail && existingOrganizationByPhone) {
-        // Both email and phone already exist
-        return res.status(400).send({
-          message: "either email and phone number are already in use",
-        });
+      //   const existingOrganizationByEmail = await models.Organization.findOne({
+      //     where: { email },
+      //   });
+      //   const existingOrganizationByPhone = await models.Organization.findOne({
+      //     where: { phone },
+      //   });
+      //   let organization;
+      //   if (existingOrganizationByEmail && existingOrganizationByPhone) {
+      //     // Both email and phone already exist
+      //     return res.status(400).send({
+      //       message: "either email and phone number are already in use",
+      //     });
+      //   }
+
+      //   if (existingOrganizationByEmail) {
+      //     // Email exists but phone doesn't match
+      //     if (existingOrganizationByEmail.phone !== phone) {
+      //       return res.status(400).send({
+      //         message: "phone already in use",
+      //       });
+      //     }
+      //     // Update existing organization
+      //     existingOrganizationByEmail.name = name;
+      //     existingOrganizationByEmail.password = hashedPassword;
+      //     await existingOrganizationByEmail.save({ transaction });
+      //     organization = existingOrganizationByEmail;
+      //   } else if (existingOrganizationByPhone) {
+      //     // Phone exists but email doesn't match
+      //     return res.status(400).send({
+      //       message: "Phone number already in use",
+      //     });
+      //   } else {
+      //     // Create new organization
+      //     const emailToken = generateToken({ email });
+      //     organization = await models.Organization.create(
+      //         {
+      //           name,
+      //           type,
+      //           description,
+      //           contact_person_name,
+      //           email,
+      //           phone,
+      //           password: hashedPassword,
+      //           location,
+      //           emailToken
+      //         },
+      //         { transaction }
+      //       );
+      //     }
+
+      //     await transaction.commit();
+      //     res.status(201).send({
+      //       id: organization.id,
+      //       name: organization.name,
+      //       email: organization.email,
+      //       phone: organization.phone
+      //     });
+      //   } catch (error) {
+      //     await transaction.rollback();
+      //     res.status(500).send({
+      //       message: error.message || "Some error occurred during signup.",
+      //     });
+      //   }
+      // };
+      const existingOrganization = await models.Organization.findOne(
+        {
+          where: {
+            [Op.or]: [{ email: email.toLowerCase() }, { phone }],
+          },
+        },
+        { transaction }
+      );
+
+      if (existingOrganization) {
+        await transaction.rollback();
+        if (
+          existingOrganization.email.toLowerCase() === email.toLowerCase() &&
+          existingOrganization.phone === phone
+        ) {
+          return res.status(400).send({
+            message: "Both email and phone number are already in use",
+          });
+        } else if (
+          existingOrganization.email.toLowerCase() === email.toLowerCase()
+        ) {
+          return res.status(400).send({ message: "Email already in use" });
+        } else {
+          return res
+            .status(400)
+            .send({ message: "Phone number already in use" });
+        }
       }
 
-      if (existingOrganizationByEmail) {
-        // Email exists but phone doesn't match
-        if (existingOrganizationByEmail.phone !== phone) {
-          return res.status(400).send({
-            message: "phone already in use",
-          });
-        }
-        // Update existing organization
-        existingOrganizationByEmail.name = name;
-        existingOrganizationByEmail.password = hashedPassword;
-        await existingOrganizationByEmail.save({ transaction });
-        organization = existingOrganizationByEmail;
-      } else if (existingOrganizationByPhone) {
-        // Phone exists but email doesn't match
-        return res.status(400).send({
-          message: "Phone number already in use",
-        });
-      } else {
-        // Create new organization
-        const emailToken = generateToken({ email });
-        organization = await models.Organization.create(
-            {
-              name,
-              type,
-              description,
-              contact_person_name,
-              email,
-              phone,
-              password: hashedPassword,
-              location,
-              emailToken
-            },
-            { transaction }
-          );
-        }
-  
-        await transaction.commit();
-        res.status(201).send({
-          id: organization.id,
-          name: organization.name,
-          email: organization.email,
-          phone: organization.phone
-        });
-      } catch (error) {
-        await transaction.rollback();
-        res.status(500).send({
-          message: error.message || "Some error occurred during signup.",
-        });
-      }
-    };
+      // If no existing admin, create a new one
+      const emailToken = generateToken({ email: email.toLowerCase() });
+
+      const newOrganization = await models.Agent.create(
+        {
+          name,
+          type,
+          description,
+          contact_person_name,
+          email,
+          phone,
+          password: hashedPassword,
+          location,
+          emailToken,
+        },
+        { transaction }
+      );
+
+      await transaction.commit();
+
+      res.status(201).send({
+        id: newOrganization.id,
+        name: newOrganization.name,
+        email: newOrganization.email,
+        phone: newOrganization.phone,
+      });
+    } catch (error) {
+      console.error("Signup error:", error);
+      if (transaction) await transaction.rollback();
+      res.status(500).send({
+        message: "An error occurred during signup. Please try again later.",
+      });
+    }
+  };
 
   signupByAdmin = async (req, res) => {
     const transaction = await sequelize.transaction();
@@ -268,74 +332,139 @@ class OrganizationController extends BaseController {
       const hashedPassword = await bcrypt.hash(password, 10);
 
       // Check for existing organization by email or phone
-      const existingOrganizationByEmail = await models.Organization.findOne({
-        where: { email },
-      });
-      const existingOrganizationByPhone = await models.Organization.findOne({
-        where: { phone },
-      });
-      let organization;
-      if (existingOrganizationByEmail && existingOrganizationByPhone) {
-        // Both email and phone already exist
-        return res.status(400).send({
-          message: "either email and phone number are already in use",
-        });
-      }
+//       const existingOrganizationByEmail = await models.Organization.findOne({
+//         where: { email },
+//       });
+//       const existingOrganizationByPhone = await models.Organization.findOne({
+//         where: { phone },
+//       });
+//       let organization;
+//       if (existingOrganizationByEmail && existingOrganizationByPhone) {
+//         // Both email and phone already exist
+//         return res.status(400).send({
+//           message: "either email and phone number are already in use",
+//         });
+//       }
 
-      if (existingOrganizationByEmail) {
-        // Email exists but phone doesn't match
-        if (existingOrganizationByEmail.phone !== phone) {
-          return res.status(400).send({
-            message: "phone already in use",
-          });
-        }
-        // Update existing organization
-        existingOrganizationByEmail.name = name;
-        existingOrganizationByEmail.password = hashedPassword;
-        await existingOrganizationByEmail.save({ transaction });
-        organization = existingOrganizationByEmail;
-      } else if (existingOrganizationByPhone) {
-        // Phone exists but email doesn't match
-        return res.status(400).send({
-          message: "Phone number already in use",
-        });
-      } else {
-        // Create new organization
-        const emailToken = generateToken({ email });
-        organization = await models.Organization.create(
-          {
-            name,
-            type,
-            description,
-            contact_person_name,
-            email,
-            phone,
-            password: hashedPassword,
-            location,
-            emailToken,
-            isEmailVerified: true,
-          },
-          { transaction }
-        );
-      }
+//       if (existingOrganizationByEmail) {
+//         // Email exists but phone doesn't match
+//         if (existingOrganizationByEmail.phone !== phone) {
+//           return res.status(400).send({
+//             message: "phone already in use",
+//           });
+//         }
+//         // Update existing organization
+//         existingOrganizationByEmail.name = name;
+//         existingOrganizationByEmail.password = hashedPassword;
+//         await existingOrganizationByEmail.save({ transaction });
+//         organization = existingOrganizationByEmail;
+//       } else if (existingOrganizationByPhone) {
+//         // Phone exists but email doesn't match
+//         return res.status(400).send({
+//           message: "Phone number already in use",
+//         });
+//       } else {
+//         // Create new organization
+//         const emailToken = generateToken({ email });
+//         organization = await models.Organization.create(
+//           {
+//             name,
+//             type,
+//             description,
+//             contact_person_name,
+//             email,
+//             phone,
+//             password: hashedPassword,
+//             location,
+//             emailToken,
+//             isEmailVerified: true,
+//           },
+//           { transaction }
+//         );
+//       }
 
-      await transaction.commit();
-      res.status(201).send({
-        id: organization.id,
-        name: organization.name,
-        email: organization.email,
-        phone: organization.phone,
-        isEmailVerified: organization.isEmailVerified,
+//       await transaction.commit();
+//       res.status(201).send({
+//         id: organization.id,
+//         name: organization.name,
+//         email: organization.email,
+//         phone: organization.phone,
+//         isEmailVerified: organization.isEmailVerified,
+//       });
+//     } catch (error) {
+//       await transaction.rollback();
+//       res.status(500).send({
+//         message: error.message || "Some error occurred during signup.",
+//       });
+//     }
+//   };
+const existingOrganization = await models.Organization.findOne(
+    {
+      where: {
+        [Op.or]: [{ email: email.toLowerCase() }, { phone }],
+      },
+    },
+    { transaction }
+  );
+
+  if (existingOrganization) {
+    await transaction.rollback();
+    if (
+      existingOrganization.email.toLowerCase() === email.toLowerCase() &&
+      existingOrganization.phone === phone
+    ) {
+      return res.status(400).send({
+        message: "Both email and phone number are already in use",
       });
-    } catch (error) {
-      await transaction.rollback();
-      res.status(500).send({
-        message: error.message || "Some error occurred during signup.",
-      });
+    } else if (
+      existingOrganization.email.toLowerCase() === email.toLowerCase()
+    ) {
+      return res.status(400).send({ message: "Email already in use" });
+    } else {
+      return res
+        .status(400)
+        .send({ message: "Phone number already in use" });
     }
-  };
-//   Email OTP verification
-emailOtpVerification = async (req, res) => {
+  }
+
+  // If no existing admin, create a new one
+  const emailToken = generateToken({ email: email.toLowerCase() });
+
+  const newOrganization = await models.Agent.create(
+    {
+      name,
+      type,
+      description,
+      contact_person_name,
+      email,
+      phone,
+      password: hashedPassword,
+      location,
+      emailToken,
+      isEmailVerified: true,
+    },
+    { transaction }
+  );
+
+  await transaction.commit();
+
+  res.status(201).send({
+    id: newOrganization.id,
+    name: newOrganization.name,
+    email: newOrganization.email,
+    phone: newOrganization.phone,
+    isEmailVerified: newOrganization.isEmailVerified,
+  });
+} catch (error) {
+  console.error("Signup error:", error);
+  if (transaction) await transaction.rollback();
+  res.status(500).send({
+    message: "An error occurred during signup. Please try again later.",
+  });
+}
+};
+  //   Email OTP verification
+  emailOtpVerification = async (req, res) => {
     const { phone, otp } = req.body;
 
     // Validate the OTP
@@ -346,7 +475,9 @@ emailOtpVerification = async (req, res) => {
     }
 
     try {
-      const organization = await models.Organization.findOne({ where: { phone } });
+      const organization = await models.Organization.findOne({
+        where: { phone },
+      });
       console.log(organization);
       if (!organization) {
         return res.status(400).json({
@@ -379,29 +510,27 @@ emailOtpVerification = async (req, res) => {
           name: organization.name,
           email: organization.email,
           phone: organization.phone,
-          isEmailVerified:organization.isEmailVerified
+          isEmailVerified: organization.isEmailVerified,
         },
       });
     } catch (error) {
-      res
-        .status(500)
-        .json({
-          success: false,
-          message: "Server Error",
-          error: error.message,
-        });
+      res.status(500).json({
+        success: false,
+        message: "Server Error",
+        error: error.message,
+      });
     }
   };
   signin = async (req, res) => {
     const { email, password } = req.body;
     if ([email, password].some((field) => field?.trim() === "")) {
-        return res
-          .status(400)
-          .send({ message: "Please provide all necessary fields" });
-      }
-      if (!email || !password) {
-        return res.status(400).send({ message: "Please Enter Email & Password" });
-      }
+      return res
+        .status(400)
+        .send({ message: "Please provide all necessary fields" });
+    }
+    if (!email || !password) {
+      return res.status(400).send({ message: "Please Enter Email & Password" });
+    }
     try {
       const organization = await models.Organization.findOne({
         where: { email },
@@ -410,7 +539,9 @@ emailOtpVerification = async (req, res) => {
         return res.status(404).send({ message: "Organization not found." });
       }
       if (!organization.isEmailVerified) {
-        return res.status(400).send({ message: "Organization is not verified" });
+        return res
+          .status(400)
+          .send({ message: "Organization is not verified" });
       }
 
       const isPasswordValid = await bcrypt.compare(
@@ -486,7 +617,9 @@ emailOtpVerification = async (req, res) => {
         return res.status(404).send({ message: "Organization not found" });
       }
       if (!organization.isEmailVerified) {
-        return res.status(400).send({ message: "Organization is not verified" });
+        return res
+          .status(400)
+          .send({ message: "Organization is not verified" });
       }
 
       // Get ResetPassword Token
@@ -554,11 +687,14 @@ emailOtpVerification = async (req, res) => {
       await organization.save({ validate: true });
 
       // Exclude password from the response
-      const updatedOrganization = await models.Organization.findByPk(organization.id, {
-        attributes: {
-          exclude: ["password"],
-        },
-      });
+      const updatedOrganization = await models.Organization.findByPk(
+        organization.id,
+        {
+          attributes: {
+            exclude: ["password"],
+          },
+        }
+      );
 
       return res.status(200).json({
         success: true,
@@ -624,7 +760,6 @@ emailOtpVerification = async (req, res) => {
       return res.status(500).send(error.message);
     }
   };
-  
 }
 
 module.exports = new OrganizationController();
