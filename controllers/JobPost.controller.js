@@ -99,7 +99,7 @@ class JobPostController extends BaseController {
 
       const jobPost = await models.Organization.findAndCountAll({
         where: {
-          organizationId: organizationId,
+          id: organizationId,
         },
         limit: limit,
         offset: offset,
