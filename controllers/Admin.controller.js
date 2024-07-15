@@ -9,6 +9,7 @@ const {
   isValidLength,
 } = require("../utils/validation");
 const sendEmail = require("../utils/sendEmail.js");
+const { Sequelize, Op } = require('sequelize');
 const sequelize = require("../config/db.config").sequelize; // Ensure this path is correct
 
 const generateToken = (admin) => {
@@ -76,7 +77,7 @@ class AdminController extends BaseController {
     try {
         transaction = await sequelize.transaction({
             timeout: 30000 // 30 seconds timeout
-        });// Use sequelize from the imported config
+        });
       const { name, email, phone, password } = req.body;
       // Validate input fields
       if (
@@ -171,64 +172,50 @@ class AdminController extends BaseController {
       //       });
       //     }
       //   };
-      const existingAdmin = await models.Admin.findOne(
-        {
-          where: {
-            [sequelize.Op.or]: [{ email: email.toLowerCase() }, { phone }],
-          },
-        },
-        { transaction }
-      );
-
-      if (existingAdmin) {
-        await transaction.rollback();
-        if (
-          existingAdmin.email.toLowerCase() === email.toLowerCase() &&
-          existingAdmin.phone === phone
-        ) {
-          return res
-            .status(400)
-            .send({
-              message: "Both email and phone number are already in use",
-            });
-        } else if (existingAdmin.email.toLowerCase() === email.toLowerCase()) {
-          return res.status(400).send({ message: "Email already in use" });
-        } else {
-          return res
-            .status(400)
-            .send({ message: "Phone number already in use" });
+      const existingAdmin = await models.Admin.findOne({
+        where: {
+            [Op.or]: [{ email: email.toLowerCase() }, { phone }]
         }
-      }
+    }, { transaction });
 
-      // If no existing admin, create a new one
-      const emailToken = generateToken({ email: email.toLowerCase() });
+    if (existingAdmin) {
+        await transaction.rollback();
+        if (existingAdmin.email.toLowerCase() === email.toLowerCase() && existingAdmin.phone === phone) {
+            return res.status(400).send({ message: "Both email and phone number are already in use" });
+        } else if (existingAdmin.email.toLowerCase() === email.toLowerCase()) {
+            return res.status(400).send({ message: "Email already in use" });
+        } else {
+            return res.status(400).send({ message: "Phone number already in use" });
+        }
+    }
 
-      const newAdmin = await models.Admin.create(
-        {
-          name,
-          email: email.toLowerCase(),
-          phone,
-          password: hashedPassword,
-          emailToken,
-        },
-        { transaction }
-      );
+    // If no existing admin, create a new one
+    const emailToken = generateToken({ email: email.toLowerCase() });
 
-      await transaction.commit();
+    const newAdmin = await models.Admin.create({
+        name,
+        email: email.toLowerCase(),
+        phone,
+        password: hashedPassword,
+        emailToken,
+    }, { transaction });
 
-      res.status(201).send({
+    await transaction.commit();
+
+    res.status(201).send({
         id: newAdmin.id,
         email: newAdmin.email,
         phone: newAdmin.phone,
-      });
-    } catch (error) {
-      console.error("Signup error:", error);
-      if (transaction) await transaction.rollback();
-      res.status(500).send({
+    });
+
+} catch (error) {
+    console.error('Signup error:', error);
+    if (transaction) await transaction.rollback();
+    res.status(500).send({
         message: "An error occurred during signup. Please try again later.",
-      });
-    }
-  };
+    });
+}
+};
 
   //   Email OTP verification
   emailOtpVerification = async (req, res) => {
