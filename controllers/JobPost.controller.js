@@ -15,7 +15,7 @@ class JobPostController extends BaseController {
       authorizeAdminOrOrganization,
       this.create.bind(this)
     );
-    this.router.get("/getAllJobPost",this.getAllJobPostByOrganizationId.bind(this));
+    this.router.get("/getAllJobPost/:organizationId",this.getAllJobPostByOrganizationId.bind(this));
   }
 
   listArgVerify(req, res, queryOptions) {
