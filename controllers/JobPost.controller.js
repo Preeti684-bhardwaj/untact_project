@@ -101,6 +101,12 @@ class JobPostController extends BaseController {
         where: {
           id: organizationId,
         },
+        include: [
+            {
+              model: models.JobPost,
+              as: "jobPosts", // Use the correct association alias
+            },
+          ],
         limit: limit,
         offset: offset,
         attributes: { exclude: ["password"] },
