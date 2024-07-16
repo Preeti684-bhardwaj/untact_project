@@ -252,17 +252,18 @@ class OrganizationController extends BaseController {
           location,
           emailToken,
         },
-        {
-            attributes: { exclude: ["password"] },
-          },
         { transaction }
       );
+
+      // Convert to plain object and exclude password
+      const organizationResponse = newOrganization.get({ plain: true });
+      delete organizationResponse.password;
 
       await transaction.commit();
 
       res.status(201).send({
-        message:"Organization registered successfully",
-        newOrganization
+        message: "Organization registered successfully",
+        ...organizationResponse,
       });
     } catch (error) {
       console.error("Signup error:", error);
@@ -445,17 +446,18 @@ class OrganizationController extends BaseController {
           emailToken,
           isEmailVerified: true,
         },
-        {
-          attributes: { exclude: ["password"] },
-        },
         { transaction }
       );
+
+      // Convert to plain object and exclude password
+      const organizationResponse = newOrganization.get({ plain: true });
+      delete organizationResponse.password;
 
       await transaction.commit();
 
       res.status(201).send({
-        message:"Organization registered successfully",
-        newOrganization
+        message: "Organization registered successfully",
+        ...organizationResponse,
       });
     } catch (error) {
       console.error("Signup error:", error);

@@ -218,17 +218,17 @@ class AgentController extends BaseController {
           password: hashedPassword,
           emailToken,
         },
-        {
-          attributes: { exclude: ["password"] },
-        },
         { transaction }
       );
+      // Convert to plain object and exclude password
+      const agentResponse = newAgent.get({ plain: true });
+      delete agentResponse.password;
 
       await transaction.commit();
 
       res.status(201).send({
         message: "Agent registered successfully",
-        newAgent,
+        ...agentResponse,
       });
     } catch (error) {
       console.error("Signup error:", error);
@@ -376,17 +376,18 @@ class AgentController extends BaseController {
           emailToken,
           isEmailVerified: true,
         },
-        {
-          attributes: { exclude: ["password"] },
-        },
         { transaction }
       );
+
+      // Convert to plain object and exclude password
+      const agentResponse = newAgent.get({ plain: true });
+      delete agentResponse.password;
 
       await transaction.commit();
 
       res.status(201).send({
         message: "Agent registered successfully",
-        newAgent,
+        ...agentResponse,
       });
     } catch (error) {
       console.error("Signup error:", error);
