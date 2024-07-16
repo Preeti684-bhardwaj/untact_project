@@ -230,8 +230,8 @@ class AgentController extends BaseController {
         id: newAgent.id,
         email: newAgent.email,
         phone: newAgent.phone,
-        createdAt,
-        updatedAt
+        createdAt:newAgent.createdAt,
+        updatedAt:newAgent.updatedAt
       });
     } catch (error) {
       console.error("Signup error:", error);

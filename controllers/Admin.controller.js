@@ -220,8 +220,8 @@ class AdminController extends BaseController {
         id: newAdmin.id,
         email: newAdmin.email,
         phone: newAdmin.phone,
-        createdAt,
-        updatedAt,
+        createdAt: newAdmin.createdAt,
+        updatedAt: newAdmin.updatedAt,
       });
     } catch (error) {
       console.error("Signup error:", error);
@@ -277,9 +277,7 @@ class AdminController extends BaseController {
           name: admin.name,
           email: admin.email,
           phone: admin.phone,
-          isEmailVerified: admin.isEmailVerified,
-          createdAt,
-          updatedAt,
+          isEmailVerified: admin.isEmailVerified
         },
       });
     } catch (error) {
@@ -325,9 +323,7 @@ class AdminController extends BaseController {
       res.status(200).send({
         message:"admin login successfully",
         id: admin.id,
-        token: token,
-        createdAt,
-        updatedAt
+        token: token
       });
     } catch (error) {
       res.status(500).send({

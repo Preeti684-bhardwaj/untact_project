@@ -454,6 +454,8 @@ const existingOrganization = await models.Organization.findOne(
     email: newOrganization.email,
     phone: newOrganization.phone,
     isEmailVerified: newOrganization.isEmailVerified,
+    createdAt:newOrganization.createdAt,
+    updatedAt:newOrganization.updatedAt
   });
 } catch (error) {
   console.error("Signup error:", error);
