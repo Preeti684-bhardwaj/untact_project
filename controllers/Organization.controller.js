@@ -411,14 +411,14 @@ class OrganizationController extends BaseController {
       if (existingOrganization) {
         await transaction.rollback();
         if (
-          existingOrganization.email.toLowerCase() === email.toLowerCase() &&
-          existingOrganization.phone === phone
+            existingOrganization.email.toLowerCase() === email.toLowerCase() &&
+            existingOrganization.phone === phone
         ) {
           return res.status(400).send({
             message: "Both email and phone number are already in use",
           });
         } else if (
-          existingOrganization.email.toLowerCase() === email.toLowerCase()
+            existingOrganization.email.toLowerCase() === email.toLowerCase()
         ) {
           return res.status(400).send({ message: "Email already in use" });
         } else {
@@ -431,7 +431,7 @@ class OrganizationController extends BaseController {
       // If no existing admin, create a new one
       const emailToken = generateToken({ email: email.toLowerCase() });
 
-      const newOrganization = await models.Agent.create(
+      const newOrganization = await models.Organization.create(
         {
           name,
           type,
