@@ -203,13 +203,17 @@ class BaseController {
     }
   }
   async updateJobPost(req, res) {
-    const transaction = await sequelize.transaction();
+    let transaction;
     try {
+      transaction = await sequelize.transaction();
+  
       const { id } = req.params;
       const { jobCards, ...jobPostData } = req.body;
-  console.log(jobCards,jobPostData)
+  
+      console.log(req.userId, jobPostData);
+  
       // Update JobPost
-      const [updatedRowsCount, [updatedJobPost]] = await models.JobPost.update(jobPostData, {
+      const [updatedRowsCount, [updatedJobPost]] = await this.model.update(jobPostData, {
         where: { id },
         returning: true,
         transaction,
@@ -253,15 +257,17 @@ class BaseController {
       // Fetch the updated JobPost with associated JobCards
       const finalUpdatedJobPost = await this.model.findByPk(id, {
         include: [{ model: models.JobCard }],
-        transaction: null // Use a new transaction or no transaction
       });
   
       res.status(200).json(finalUpdatedJobPost);
     } catch (error) {
-      await transaction.rollback();
+      console.error('Error in updateJobPost:', error);
+      if (transaction && !transaction.finished) {
+        await transaction.rollback();
+      }
       res.status(400).json({ error: error.message });
     }
-  }
+  };
 
   async delete(req, res) {
     try {
