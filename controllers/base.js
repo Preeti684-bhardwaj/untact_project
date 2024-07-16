@@ -209,7 +209,7 @@ class BaseController {
       const { jobCards, ...jobPostData } = req.body;
   
       // Update JobPost
-      const [updatedRowsCount, [updatedJobPost]] = await this.model.update(jobPostData, {
+      const [updatedRowsCount, [updatedJobPost]] = await models.JobPost.update(jobPostData, {
         where: { id },
         returning: true,
         transaction,
