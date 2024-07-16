@@ -224,32 +224,36 @@ class BaseController {
         return res.status(404).json({ error: "JobPost not found" });
       }
   
-      // Update or create JobCards
-      if (jobCards && jobCards.length > 0) {
-        for (const jobCardData of jobCards) {
-          if (jobCardData.id) {
-            // Update existing JobCard
-            await models.JobCard.update({
-              job_title: updatedJobPost.job_title,
-              job_description: updatedJobPost.job_description,
-              customerDetail: jobCardData.customerDetail,
-              priority: updatedJobPost.priority,
-              due_date: updatedJobPost.due_date,
-              status: jobCardData.status || updatedJobPost.status,
-            }, {
-              where: { id: jobCardData.id, JobPostId: id },
-              transaction,
-            });
-          } else {
-            // Create new JobCard using your existing method
-            await this.afterCreate(
-              { body: { jobCards: [jobCardData] } },
-              res,
-              updatedJobPost,
-              transaction
-            );
-          }
+      // Update all associated JobCards with the new job_title and job_description
+      await models.JobCard.update(
+        {
+          job_title: updatedJobPost.job_title,
+          job_description: updatedJobPost.job_description,
+          priority: updatedJobPost.priority,
+          due_date: updatedJobPost.due_date,
+          status: updatedJobPost.status,
+        },
+        {
+          where: { JobPostId: id },
+          transaction,
         }
+      );
+  
+      // If new jobCards are provided, create them
+      if (jobCards && jobCards.length > 0) {
+        const newJobCards = jobCards.map(jobCardData => ({
+          job_title: updatedJobPost.job_title,
+          job_description: updatedJobPost.job_description,
+          customerDetail: jobCardData,
+          priority: updatedJobPost.priority,
+          due_date: updatedJobPost.due_date,
+          status: updatedJobPost.status,
+          JobPostId: id,
+          OrganizationId: updatedJobPost.OrganizationId,
+          AdminId: updatedJobPost.AdminId,
+        }));
+  
+        await models.JobCard.bulkCreate(newJobCards, { transaction });
       }
   
       await transaction.commit();
@@ -258,7 +262,7 @@ class BaseController {
       const finalUpdatedJobPost = await this.model.findByPk(id, {
         include: [{ 
           model: models.JobCard,
-          as: 'cards'  // Use the correct alias here
+          as: 'cards'  // Make sure this alias matches your association
         }],
       });
   
