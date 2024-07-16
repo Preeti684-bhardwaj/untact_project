@@ -225,9 +225,15 @@ class BaseController {
         await existingJobPost.update(jobPostData, { transaction });
       }
   
-      // If new jobCards are provided, create them and update the jobCards array
+      // If new jobCards are provided, append them to the existing jobCards
       if (jobCards && jobCards.length > 0) {
-        const newJobCards = jobCards.map(jobCardData => ({
+        const currentJobCards = existingJobPost.jobCards || [];
+        const updatedJobCards = [...currentJobCards, ...jobCards];
+  
+        await existingJobPost.update({ jobCards: updatedJobCards }, { transaction });
+  
+        // Create new JobCard entries
+        const newJobCardEntries = jobCards.map(jobCardData => ({
           job_title: existingJobPost.job_title,
           job_description: existingJobPost.job_description,
           customerDetail: jobCardData,
@@ -239,10 +245,7 @@ class BaseController {
           AdminId: existingJobPost.AdminId,
         }));
   
-        await models.JobCard.bulkCreate(newJobCards, { transaction });
-  
-        // Update the jobCards array in the JobPost
-        await existingJobPost.update({ jobCards }, { transaction });
+        await models.JobCard.bulkCreate(newJobCardEntries, { transaction });
       }
   
       await transaction.commit();
