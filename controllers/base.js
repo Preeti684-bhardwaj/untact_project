@@ -3,7 +3,7 @@ const axios = require('axios');
 const sequelize = db.sequelize;
 const express = require('express');
 const models = require('../models');
-const { authenticate, authorizeAdmin } = require("../controllers/auth");
+const { authenticate, authorizeAdmin ,authorizeAdminOrOrganization} = require("../controllers/auth");
 class BaseController {
   constructor(model) {
     this.model = model;
@@ -17,6 +17,7 @@ class BaseController {
     this.router.get('/:id', this.read.bind(this));
     this.router.post('/', this.create.bind(this));
     this.router.put('/:id', this.update.bind(this));
+    this.router.put('/update/:id',authenticate ,authorizeAdminOrOrganization,this.updateJobPost.bind(this))
     this.router.put('/updateByAdmin/:id',authenticate, authorizeAdmin, this.update.bind(this));
     this.router.delete('/:id', this.delete.bind(this));
     this.router.delete('/deletedByAdmin/:id',authenticate, authorizeAdmin, this.delete.bind(this));
@@ -199,6 +200,66 @@ class BaseController {
       }
     } catch (error) {
       res.status(500).json({ error: error.message });
+    }
+  }
+  async updateJobPost(req, res) {
+    const transaction = await sequelize.transaction();
+    try {
+      const { id } = req.params;
+      const { jobCards, ...jobPostData } = req.body;
+  
+      // Update JobPost
+      const [updatedRowsCount, [updatedJobPost]] = await this.model.update(jobPostData, {
+        where: { id },
+        returning: true,
+        transaction,
+      });
+  
+      if (updatedRowsCount === 0) {
+        await transaction.rollback();
+        return res.status(404).json({ error: "JobPost not found" });
+      }
+  
+      // Update or create JobCards
+      if (jobCards && jobCards.length > 0) {
+        for (const jobCardData of jobCards) {
+          if (jobCardData.id) {
+            // Update existing JobCard
+            await models.JobCard.update({
+              job_title: updatedJobPost.job_title,
+              job_description: updatedJobPost.job_description,
+              customerDetail: jobCardData.customerDetail,
+              priority: updatedJobPost.priority,
+              due_date: updatedJobPost.due_date,
+              status: jobCardData.status || updatedJobPost.status,
+            }, {
+              where: { id: jobCardData.id, JobPostId: id },
+              transaction,
+            });
+          } else {
+            // Create new JobCard using your existing method
+            await this.afterCreate(
+              { body: { jobCards: [jobCardData] } },
+              res,
+              updatedJobPost,
+              transaction
+            );
+          }
+        }
+      }
+  
+      await transaction.commit();
+      
+      // Fetch the updated JobPost with associated JobCards
+      const finalUpdatedJobPost = await this.model.findByPk(id, {
+        include: [{ model: models.JobCard }],
+        transaction: null // Use a new transaction or no transaction
+      });
+  
+      res.status(200).json(finalUpdatedJobPost);
+    } catch (error) {
+      await transaction.rollback();
+      res.status(400).json({ error: error.message });
     }
   }
 
