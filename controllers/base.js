@@ -256,7 +256,10 @@ class BaseController {
       
       // Fetch the updated JobPost with associated JobCards
       const finalUpdatedJobPost = await this.model.findByPk(id, {
-        include: [{ model: models.JobCard }],
+        include: [{ 
+          model: models.JobCard,
+          as: 'jobCards'  // Use the correct alias here
+        }],
       });
   
       res.status(200).json(finalUpdatedJobPost);
@@ -267,7 +270,7 @@ class BaseController {
       }
       res.status(400).json({ error: error.message });
     }
-  };
+  }
 
   async delete(req, res) {
     try {
