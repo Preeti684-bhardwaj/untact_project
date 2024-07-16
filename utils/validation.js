@@ -16,7 +16,7 @@ const isValidLength = (name) => {
     // [A-Za-z]*   : Followed by zero or more letters
     // $           : End of string
     // Length check: Between 4 and 40 characters
-    const nameRegex = /^[A-Za-z]{4,40}$/;
+    const nameRegex = /^[A-Za-z](?:\s?[A-Za-z]+)*[A-Za-z]$/;
     return nameRegex.test(name);
   };
 
