@@ -212,45 +212,31 @@ class BaseController {
   
       console.log(req.userId, jobPostData);
   
-      // Update JobPost
-      const [updatedRowsCount, [updatedJobPost]] = await this.model.update(jobPostData, {
-        where: { id },
-        returning: true,
-        transaction,
-      });
+      // Find the existing JobPost
+      const existingJobPost = await this.model.findByPk(id, { transaction });
   
-      if (updatedRowsCount === 0) {
+      if (!existingJobPost) {
         await transaction.rollback();
         return res.status(404).json({ error: "JobPost not found" });
       }
   
-      // Update all associated JobCards with the new job_title and job_description
-      await models.JobCard.update(
-        {
-          job_title: updatedJobPost.job_title,
-          job_description: updatedJobPost.job_description,
-          priority: updatedJobPost.priority,
-          due_date: updatedJobPost.due_date,
-          status: updatedJobPost.status,
-        },
-        {
-          where: { JobPostId: id },
-          transaction,
-        }
-      );
+      // Update JobPost if there's any data to update
+      if (Object.keys(jobPostData).length > 0) {
+        await existingJobPost.update(jobPostData, { transaction });
+      }
   
       // If new jobCards are provided, create them
       if (jobCards && jobCards.length > 0) {
         const newJobCards = jobCards.map(jobCardData => ({
-          job_title: updatedJobPost.job_title,
-          job_description: updatedJobPost.job_description,
+          job_title: existingJobPost.job_title,
+          job_description: existingJobPost.job_description,
           customerDetail: jobCardData,
-          priority: updatedJobPost.priority,
-          due_date: updatedJobPost.due_date,
-          status: updatedJobPost.status,
+          priority: existingJobPost.priority,
+          due_date: existingJobPost.due_date,
+          status: existingJobPost.status,
           JobPostId: id,
-          OrganizationId: updatedJobPost.OrganizationId,
-          AdminId: updatedJobPost.AdminId,
+          OrganizationId: existingJobPost.OrganizationId,
+          AdminId: existingJobPost.AdminId,
         }));
   
         await models.JobCard.bulkCreate(newJobCards, { transaction });
