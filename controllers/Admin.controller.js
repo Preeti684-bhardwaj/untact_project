@@ -210,17 +210,18 @@ class AdminController extends BaseController {
           password: hashedPassword,
           emailToken,
         },
-        {
-            attributes: { exclude: ["password"] },
-          },
         { transaction }
       );
-
+      
+      // Convert to plain object and exclude password
+      const adminResponse = newAdmin.get({ plain: true });
+      delete adminResponse.password;
+      
       await transaction.commit();
-
+      
       res.status(201).send({
-        message: "admin registered successfully",
-        newAdmin
+        message: "Admin registered successfully",
+        ...adminResponse
       });
     } catch (error) {
       console.error("Signup error:", error);
