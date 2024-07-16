@@ -140,14 +140,18 @@ console.log(token);
 };
 
 exports.authorizeAdmin = async (req, res, next) => {
-    try {
-        const admin = await models.Admin.findByPk(req.userId);
+    const id = req.userId;
+    const type=req.userType;
+try{
+    if (type === 'ADMIN') {
+        const admin = await models.Admin.findByPk(id);
 
         if (!admin) {
             return res.status(403).send({ message: 'You are not authorized to access this resource.' });
         }
-
-        next();
+        // If user is an admin, proceed
+        return next();
+    }
     } catch (error) {
         res.status(500).send({ message: error.message || 'An error occurred during authorization.' });
     }
