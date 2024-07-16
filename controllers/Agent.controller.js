@@ -195,11 +195,9 @@ class AgentController extends BaseController {
           existingAgent.email.toLowerCase() === email.toLowerCase() &&
           existingAgent.phone === phone
         ) {
-          return res
-            .status(400)
-            .send({
-              message: "Both email and phone number are already in use",
-            });
+          return res.status(400).send({
+            message: "Both email and phone number are already in use",
+          });
         } else if (existingAgent.email.toLowerCase() === email.toLowerCase()) {
           return res.status(400).send({ message: "Email already in use" });
         } else {
@@ -220,18 +218,17 @@ class AgentController extends BaseController {
           password: hashedPassword,
           emailToken,
         },
+        {
+          attributes: { exclude: ["password"] },
+        },
         { transaction }
       );
 
       await transaction.commit();
 
       res.status(201).send({
-        message:"Agent registered successfully",
-        id: newAgent.id,
-        email: newAgent.email,
-        phone: newAgent.phone,
-        createdAt:newAgent.createdAt,
-        updatedAt:newAgent.updatedAt
+        message: "Agent registered successfully",
+        newAgent,
       });
     } catch (error) {
       console.error("Signup error:", error);
@@ -355,11 +352,9 @@ class AgentController extends BaseController {
           existingAgent.email.toLowerCase() === email.toLowerCase() &&
           existingAgent.phone === phone
         ) {
-          return res
-            .status(400)
-            .send({
-              message: "Both email and phone number are already in use",
-            });
+          return res.status(400).send({
+            message: "Both email and phone number are already in use",
+          });
         } else if (existingAgent.email.toLowerCase() === email.toLowerCase()) {
           return res.status(400).send({ message: "Email already in use" });
         } else {
@@ -381,16 +376,17 @@ class AgentController extends BaseController {
           emailToken,
           isEmailVerified: true,
         },
+        {
+          attributes: { exclude: ["password"] },
+        },
         { transaction }
       );
 
       await transaction.commit();
 
       res.status(201).send({
-        id: newAgent.id,
-        email: newAgent.email,
-        phone: newAgent.phone,
-        isEmailVerified: newAgent.isEmailVerified,
+        message: "Agent registered successfully",
+        newAgent,
       });
     } catch (error) {
       console.error("Signup error:", error);

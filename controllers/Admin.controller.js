@@ -210,6 +210,9 @@ class AdminController extends BaseController {
           password: hashedPassword,
           emailToken,
         },
+        {
+            attributes: { exclude: ["password"] },
+          },
         { transaction }
       );
 
@@ -217,11 +220,7 @@ class AdminController extends BaseController {
 
       res.status(201).send({
         message: "admin registered successfully",
-        id: newAdmin.id,
-        email: newAdmin.email,
-        phone: newAdmin.phone,
-        createdAt: newAdmin.createdAt,
-        updatedAt: newAdmin.updatedAt,
+        newAdmin
       });
     } catch (error) {
       console.error("Signup error:", error);

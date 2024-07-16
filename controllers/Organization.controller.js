@@ -240,7 +240,7 @@ class OrganizationController extends BaseController {
       // If no existing admin, create a new one
       const emailToken = generateToken({ email: email.toLowerCase() });
 
-      const newOrganization = await models.Agent.create(
+      const newOrganization = await models.Organization.create(
         {
           name,
           type,
@@ -252,16 +252,17 @@ class OrganizationController extends BaseController {
           location,
           emailToken,
         },
+        {
+            attributes: { exclude: ["password"] },
+          },
         { transaction }
       );
 
       await transaction.commit();
 
       res.status(201).send({
-        id: newOrganization.id,
-        name: newOrganization.name,
-        email: newOrganization.email,
-        phone: newOrganization.phone,
+        message:"Organization registered successfully",
+        newOrganization
       });
     } catch (error) {
       console.error("Signup error:", error);
@@ -411,14 +412,14 @@ class OrganizationController extends BaseController {
       if (existingOrganization) {
         await transaction.rollback();
         if (
-            existingOrganization.email.toLowerCase() === email.toLowerCase() &&
-            existingOrganization.phone === phone
+          existingOrganization.email.toLowerCase() === email.toLowerCase() &&
+          existingOrganization.phone === phone
         ) {
           return res.status(400).send({
             message: "Both email and phone number are already in use",
           });
         } else if (
-            existingOrganization.email.toLowerCase() === email.toLowerCase()
+          existingOrganization.email.toLowerCase() === email.toLowerCase()
         ) {
           return res.status(400).send({ message: "Email already in use" });
         } else {
@@ -444,19 +445,17 @@ class OrganizationController extends BaseController {
           emailToken,
           isEmailVerified: true,
         },
+        {
+          attributes: { exclude: ["password"] },
+        },
         { transaction }
       );
 
       await transaction.commit();
 
       res.status(201).send({
-        id: newOrganization.id,
-        name: newOrganization.name,
-        email: newOrganization.email,
-        phone: newOrganization.phone,
-        isEmailVerified: newOrganization.isEmailVerified,
-        createdAt: newOrganization.createdAt,
-        updatedAt: newOrganization.updatedAt,
+        message:"Organization registered successfully",
+        newOrganization
       });
     } catch (error) {
       console.error("Signup error:", error);
