@@ -325,7 +325,7 @@ class OrganizationController extends BaseController {
       if (!isValidLength(contact_person_name)) {
         return res.status(400).send({
           message:
-            "Name should be greater than 3 characters and less than 40 characters and should not start with number",
+            "contact person name should be greater than 3 characters and less than 40 characters and should not start with number",
         });
       }
 
