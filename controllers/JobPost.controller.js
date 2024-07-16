@@ -15,7 +15,16 @@ class JobPostController extends BaseController {
       authorizeAdminOrOrganization,
       this.create.bind(this)
     );
-    this.router.get("/getAllJobPost/:organizationId",this.getAllJobPostByOrganizationId.bind(this));
+    this.router.get(
+      "/getAllJobPost/:organizationId",
+      this.getAllJobPostByOrganizationId.bind(this)
+    );
+    this.router.delete(
+      "/delete/:id",
+      authenticate,
+      authorizeAdminOrOrganization,
+      this.deleteJobPost.bind(this)
+    );
   }
 
   listArgVerify(req, res, queryOptions) {
@@ -102,11 +111,11 @@ class JobPostController extends BaseController {
           id: organizationId,
         },
         include: [
-            {
-              model: models.JobPost,
-              as: "jobPosts", // Use the correct association alias
-            },
-          ],
+          {
+            model: models.JobPost,
+            as: "jobPosts", // Use the correct association alias
+          },
+        ],
         limit: limit,
         offset: offset,
         attributes: { exclude: ["password"] },
@@ -122,6 +131,34 @@ class JobPostController extends BaseController {
         currentPage: page,
       });
     } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  };
+  deleteJobPost = async (req, res) => {
+    let transaction;
+    try {
+      transaction = await sequelize.transaction();
+
+      const id = req.params.id;
+      const jobPost = await this.model.findByPk(id, { transaction });
+
+      if (!jobPost) {
+        await transaction.rollback();
+        return res.status(404).json({ error: "JobPost not found" });
+      }
+
+      // This will delete the JobPost and all associated JobCards
+      await jobPost.destroy({ transaction });
+
+      await transaction.commit();
+      return res
+        .status(200)
+        .json({
+          message: "JobPost and associated JobCards deleted successfully",
+        });
+    } catch (error) {
+      if (transaction) await transaction.rollback();
+      console.error("Error in delete:", error);
       res.status(500).json({ error: error.message });
     }
   };
