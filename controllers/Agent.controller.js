@@ -226,9 +226,12 @@ class AgentController extends BaseController {
       await transaction.commit();
 
       res.status(201).send({
+        message:"Agent registered successfully",
         id: newAgent.id,
         email: newAgent.email,
         phone: newAgent.phone,
+        createdAt,
+        updatedAt
       });
     } catch (error) {
       console.error("Signup error:", error);

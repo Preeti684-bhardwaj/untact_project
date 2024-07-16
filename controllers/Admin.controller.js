@@ -9,7 +9,7 @@ const {
   isValidLength,
 } = require("../utils/validation");
 const sendEmail = require("../utils/sendEmail.js");
-const { Op } = require('sequelize');
+const { Op } = require("sequelize");
 const sequelize = require("../config/db.config").sequelize; // Ensure this path is correct
 
 const generateToken = (admin) => {
@@ -75,9 +75,7 @@ class AdminController extends BaseController {
   signup = async (req, res) => {
     let transaction;
     try {
-        transaction = await sequelize.transaction({
-            timeout: 30000 // 30 seconds timeout
-        });
+      transaction = await sequelize.transaction()
       const { name, email, phone, password } = req.body;
       // Validate input fields
       if (
@@ -172,50 +170,67 @@ class AdminController extends BaseController {
       //       });
       //     }
       //   };
-      const existingAdmin = await models.Admin.findOne({
-        where: {
-            [Op.or]: [{ email: email.toLowerCase() }, { phone }]
-        }
-    }, { transaction });
+      const existingAdmin = await models.Admin.findOne(
+        {
+          where: {
+            [Op.or]: [{ email: email.toLowerCase() }, { phone }],
+          },
+        },
+        { transaction }
+      );
 
-    if (existingAdmin) {
+      if (existingAdmin) {
         await transaction.rollback();
-        if (existingAdmin.email.toLowerCase() === email.toLowerCase() && existingAdmin.phone === phone) {
-            return res.status(400).send({ message: "Both email and phone number are already in use" });
+        if (
+          existingAdmin.email.toLowerCase() === email.toLowerCase() &&
+          existingAdmin.phone === phone
+        ) {
+          return res
+            .status(400)
+            .send({
+              message: "Both email and phone number are already in use",
+            });
         } else if (existingAdmin.email.toLowerCase() === email.toLowerCase()) {
-            return res.status(400).send({ message: "Email already in use" });
+          return res.status(400).send({ message: "Email already in use" });
         } else {
-            return res.status(400).send({ message: "Phone number already in use" });
+          return res
+            .status(400)
+            .send({ message: "Phone number already in use" });
         }
-    }
+      }
 
-    // If no existing admin, create a new one
-    const emailToken = generateToken({ email: email.toLowerCase() });
+      // If no existing admin, create a new one
+      const emailToken = generateToken({ email: email.toLowerCase() });
 
-    const newAdmin = await models.Admin.create({
-        name,
-        email: email.toLowerCase(),
-        phone,
-        password: hashedPassword,
-        emailToken,
-    }, { transaction });
+      const newAdmin = await models.Admin.create(
+        {
+          name,
+          email: email.toLowerCase(),
+          phone,
+          password: hashedPassword,
+          emailToken,
+        },
+        { transaction }
+      );
 
-    await transaction.commit();
+      await transaction.commit();
 
-    res.status(201).send({
+      res.status(201).send({
+        message: "admin registered successfully",
         id: newAdmin.id,
         email: newAdmin.email,
         phone: newAdmin.phone,
-    });
-
-} catch (error) {
-    console.error('Signup error:', error);
-    if (transaction) await transaction.rollback();
-    res.status(500).send({
+        createdAt,
+        updatedAt,
+      });
+    } catch (error) {
+      console.error("Signup error:", error);
+      if (transaction) await transaction.rollback();
+      res.status(500).send({
         message: "An error occurred during signup. Please try again later.",
-    });
-}
-};
+      });
+    }
+  };
 
   //   Email OTP verification
   emailOtpVerification = async (req, res) => {
@@ -263,6 +278,8 @@ class AdminController extends BaseController {
           email: admin.email,
           phone: admin.phone,
           isEmailVerified: admin.isEmailVerified,
+          createdAt,
+          updatedAt,
         },
       });
     } catch (error) {
@@ -306,8 +323,11 @@ class AdminController extends BaseController {
       const token = generateToken(obj);
 
       res.status(200).send({
+        message:"admin login successfully",
         id: admin.id,
         token: token,
+        createdAt,
+        updatedAt
       });
     } catch (error) {
       res.status(500).send({
