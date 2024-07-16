@@ -258,7 +258,7 @@ class BaseController {
       const finalUpdatedJobPost = await this.model.findByPk(id, {
         include: [{ 
           model: models.JobCard,
-          as: 'jobCards'  // Use the correct alias here
+          as: 'cards'  // Use the correct alias here
         }],
       });
   
