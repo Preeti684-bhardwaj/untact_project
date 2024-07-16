@@ -16,7 +16,7 @@ models.JobPost.belongsTo(models.Organization);
 models.Admin.hasMany(models.JobPost, { as: 'jobPostsByAdmin' });
 models.JobPost.belongsTo(models.Admin);
 
-models.JobPost.hasMany(models.JobCard, { as: 'jobCards' });
+models.JobPost.hasMany(models.JobCard, { as: 'cards' });
 models.JobCard.belongsTo(models.JobPost);
 
 models.Organization.hasMany(models.JobCard, { as: 'cardsByOrganization' });
