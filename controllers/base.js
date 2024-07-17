@@ -202,47 +202,61 @@ class BaseController {
       res.status(500).json({ error: error.message });
     }
   }
-  async updateJobPost(req, res) {
+   async updateJobPost(req, res) {
     let transaction;
     try {
       transaction = await sequelize.transaction();
   
       const { id } = req.params;
-      const { jobCards, ...jobPostData } = req.body;
+      const { jobCards, ...updatedJobPostData } = req.body;
   
-      console.log(req.userId, jobPostData);
+      const jobPost = await this.model.findByPk(id, {
+        include: [{ model: models.JobCard, as: 'cards' }],
+        transaction,
+      });
   
-      // Find the existing JobPost
-      const existingJobPost = await this.model.findByPk(id, { transaction });
-  
-      if (!existingJobPost) {
+      if (!jobPost) {
         await transaction.rollback();
-        return res.status(404).json({ error: "JobPost not found" });
+        return res.status(404).json({ error: 'JobPost not found' });
       }
   
-      // Update JobPost if there's any data to update
-      if (Object.keys(jobPostData).length > 0) {
-        await existingJobPost.update(jobPostData, { transaction });
-      }
+      // Update the JobPost fields
+      await jobPost.update(updatedJobPostData, { transaction });
+  
+      // Update existing JobCards with common fields
+      await Promise.all(
+        jobPost.cards.map(async (jobCard) => {
+          await jobCard.update(
+            {
+              job_title: updatedJobPostData.job_title || jobCard.job_title,
+              job_description: updatedJobPostData.job_description || jobCard.job_description,
+              priority: updatedJobPostData.priority || jobCard.priority,
+              due_date: updatedJobPostData.due_date || jobCard.due_date,
+              status: updatedJobPostData.status || jobCard.status || 'Open',
+            },
+            { transaction }
+          );
+        })
+      );
   
       // If new jobCards are provided, append them to the existing jobCards
       if (jobCards && jobCards.length > 0) {
-        const currentJobCards = existingJobPost.jobCards || [];
+        const currentJobCards = jobPost.jobCards || [];
         const updatedJobCards = [...currentJobCards, ...jobCards];
   
-        await existingJobPost.update({ jobCards: updatedJobCards }, { transaction });
+        await jobPost.update({ jobCards: updatedJobCards }, { transaction });
   
         // Create new JobCard entries
         const newJobCardEntries = jobCards.map(jobCardData => ({
-          job_title: existingJobPost.job_title,
-          job_description: existingJobPost.job_description,
+          job_title: jobPost.job_title,
+          job_description: jobPost.job_description,
           customerDetail: jobCardData,
-          priority: existingJobPost.priority,
-          due_date: existingJobPost.due_date,
-          status: existingJobPost.status,
+          priority: jobPost.priority,
+          due_date: jobPost.due_date,
+          status: jobPost.status,
           JobPostId: id,
-          OrganizationId: existingJobPost.OrganizationId,
-          AdminId: existingJobPost.AdminId,
+          OrganizationId: jobPost.OrganizationId,
+          AdminId: jobPost.AdminId,
         }));
   
         await models.JobCard.bulkCreate(newJobCardEntries, { transaction });

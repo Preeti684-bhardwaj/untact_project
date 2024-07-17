@@ -5,9 +5,9 @@ const env = {
   host: 'localhost',
   dialect: 'postgres',
   pool: {
-    max: 5,
+    max: 10, // Increase this if needed
     min: 0,
-    acquire: 30000,
+    acquire: 60000, // Increase to 60 seconds
     idle: 10000
   },
 port:5432
