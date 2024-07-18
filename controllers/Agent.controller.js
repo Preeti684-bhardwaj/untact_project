@@ -628,7 +628,7 @@ class AgentController extends BaseController {
     try {
       const agent = await models.Agent.findOne({
         where: {
-          phone: email.trim(),
+          email: email.trim(),
         },
       });
 
