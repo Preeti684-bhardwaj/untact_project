@@ -34,8 +34,9 @@ class BaseController {
     try {
       const{page=1 ,limit}=req.query;
       const { user, attributes, include, where } = req.body;
-
-      const offset = (page - 1) * limit;
+const pageValue=parseInt(page,10)
+const limitValue=parseInt(limit,10)
+      const offset = (pageValue - 1) * limitValue;
 
       let validAttributes = attributes ? attributes.filter(attr => this.validAttributesCache.has(attr)) : null;
       if (validAttributes && validAttributes.length === 0) {
@@ -73,7 +74,7 @@ class BaseController {
         attributes: validAttributes,
         where: queryWhere,
         include: queryInclude,
-        limit: limit,
+        limit: limitValue,
         offset: offset,
         order: [['id', 'ASC']]
       };
@@ -86,8 +87,8 @@ class BaseController {
         success:true,
         data: results.rows,
         total: results.count,
-        totalPages: Math.ceil(results.count / limit),
-        currentPage: page
+        totalPages: Math.ceil(results.count / limitValue),
+        currentPage: pageValue
       });
     } catch (error) {
       res.status(500).json({ error: error.message });
