@@ -1,6 +1,6 @@
 const moment = require("moment");
 const validator = require("validator");
-const  PASSWORD_REGEX  =/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&.])[A-Za-z\d@$!%*?&.]{8,}$/;
+const  PASSWORD_REGEX  =/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&.,:;<>^()[\]{}+_=|/~`#\s\\-])[A-Za-z\d@$!%*?&.,:;<>^()[\]{}+_=|/~`#\s\\-]{8,}$/;
 
 // Get today's date
 const today = moment();
@@ -11,14 +11,27 @@ const isValidPhone = (phone) => validator.isMobilePhone(phone, "en-IN");
 
 const isValidPassword = (password) => PASSWORD_REGEX.test(password)
 const isValidLength = (name) => {
-    // Regex explanation:
-    // ^[A-Za-z]   : Start with a letter
-    // [A-Za-z]*   : Followed by zero or more letters
-    // $           : End of string
-    // Length check: Between 4 and 40 characters
-    const nameRegex = /^(?=.{4,40}$)[A-Za-z](?:\s?[A-Za-z]+)*[A-Za-z]$/;
-    return nameRegex.test(name);
-  };
+  const nameRegex = /^(?=.{4,40}$)[A-Za-z](?:\s?[A-Za-z]+)*[A-Za-z]$/;
+  if (!name) {
+    return "Name is required";
+  }
+  if (/^\s/.test(name)) {
+    return "Name should not start with a space";
+  }
+  if (name.length < 4 || name.length > 40) {
+    return "Name should be between 4 and 40 characters long";
+  }
+  if (/^[0-9]/.test(name)) {
+    return "Name should not start with a number";
+  }
+  if (/\d/.test(name)) {
+    return "Name should not contain numbers";
+  }
+  if (!nameRegex.test(name)) {
+    return "Name contains invalid characters";
+  }
+  return null;  // No errors
+};
 
 // const isValidLength = name => name.length >= 4 && name.length<=40 && !/^\d/.test(name)
 

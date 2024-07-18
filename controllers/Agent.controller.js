@@ -51,6 +51,13 @@ class AgentController extends BaseController {
     this.router.post("/resetpassword/:agentId", this.resetPassword.bind(this));
     this.router.post("/sendOtp", this.sendOtp.bind(this));
     this.router.post("/otpVerification", this.emailOtpVerification.bind(this));
+    this.router.put(
+      "/updateAgentByAdmin/:id",
+      authenticate,
+      authorizeAdmin,
+      this.updateAgentByAdmin.bind(this)
+    );
+    this.router.put("/updateByAgent/:id", this.updateByAgent.bind(this));
   }
 
   listArgVerify(req, res, queryOptions) {
@@ -84,106 +91,68 @@ class AgentController extends BaseController {
     try {
       const { name, email, phone, password } = req.body;
 
+      // mandatory field check
+      if (!name) {
+        return res
+          .status(400)
+          .send({ success: false, message: "Name is required" });
+      }
+      if (!email) {
+        return res
+          .status(400)
+          .send({ success: false, message: "Email is required" });
+      }
+      if (phone) {
+        return res
+          .status(400)
+          .send({ success: false, message: "Phone is required" });
+      }
+      if (password) {
+        return res
+          .status(400)
+          .send({ success: false, message: "Password is required" });
+      }
+
       // Validate input fields
       if (
         [name, email, phone, password].some((field) => field?.trim() === "")
       ) {
-        return res
-          .status(400)
-          .send({ message: "Please provide all necessary fields" });
+        return res.status(400).send({
+          success: false,
+          message: "Please provide all necessary fields",
+        });
+      }
+      // Validate name
+      const nameError = isValidLength(name);
+      if (nameError) {
+        return res.status(400).send({ success: false, message: nameError });
       }
 
       if (!isValidPhone(phone)) {
-        return res.status(400).send({ message: "Invalid Phone Number" });
+        return res
+          .status(400)
+          .send({ success: false, message: "Invalid Phone Number" });
       }
 
       if (!isValidEmail(email)) {
-        return res.status(400).send({ message: "Invalid email" });
+        return res
+          .status(400)
+          .send({ success: false, message: "Invalid email" });
       }
 
       if (!isValidPassword(password)) {
         return res.status(400).send({
+          success: false,
           message:
             "Password must contain at least 8 characters, including uppercase, lowercase, number and special character",
         });
       }
 
-      if (!isValidLength(name)) {
-        return res.status(400).send({
-          message:
-            "Name should be greater than 3 characters and less than 40 characters and should not start with number",
-        });
-      }
-
       const hashedPassword = await bcrypt.hash(password, 10);
-
-      // Check for existing agent by email or phone
-      //       const existingAgentByEmail = await models.Agent.findOne({
-      //         where: { email },
-      //       });
-      //       const existingAgentByPhone = await models.Agent.findOne({
-      //         where: { phone },
-      //       });
-      //       let agent;
-      //       if (existingAgentByEmail && existingAgentByPhone) {
-      //         // Both email and phone already exist
-      //         return res.status(400).send({
-      //           message: "either email and phone number are already in use",
-      //         });
-      //       }
-
-      //       if (existingAgentByEmail) {
-      //         if (existingAgentByPhone.isEmailVerified) {
-      //             return req.status(400).send({message:"agent already exists and is verified"});
-      //           }
-      //         // Email exists but phone doesn't match
-      //         if (existingAgentByEmail.phone !== phone) {
-      //           return res.status(400).send({
-      //             message: "phone already in use",
-      //           });
-      //         }
-      //         // Update existing agent
-      //         existingAgentByEmail.name = name;
-      //         existingAgentByEmail.password = hashedPassword;
-      //         await existingAgentByEmail.save({ transaction });
-      //         agent = existingAgentByEmail;
-      //       } else if (existingAgentByPhone) {
-      //         // Phone exists but email doesn't match
-      //         return res.status(400).send({
-      //           message: "Phone number already in use",
-      //         });
-      //       } else {
-      //         // Create new agent
-      //         const emailToken = generateToken({ email });
-      //         agent = await models.Agent.create(
-      //           {
-      //             name,
-      //             email,
-      //             phone,
-      //             password: hashedPassword,
-      //             emailToken,
-      //           },
-      //           { transaction }
-      //         );
-      //       }
-
-      //       await transaction.commit();
-      //       res.status(201).send({
-      //         id: agent.id,
-      //         email: agent.email,
-      //         phone: agent.phone,
-      //       });
-      //     } catch (error) {
-      //       await transaction.rollback();
-      //       res.status(500).send({
-      //         message: error.message || "Some error occurred during signup.",
-      //       });
-      //     }
-      //   };
       const existingAgent = await models.Agent.findOne(
         {
           where: {
-            [Op.or]: [{ email: email.toLowerCase() }, { phone }],
+            [Op.or]: [{ email: email.toLowerCase() }, { phone: phone }],
           },
         },
         { transaction }
@@ -196,14 +165,17 @@ class AgentController extends BaseController {
           existingAgent.phone === phone
         ) {
           return res.status(400).send({
+            success: false,
             message: "Both email and phone number are already in use",
           });
         } else if (existingAgent.email.toLowerCase() === email.toLowerCase()) {
-          return res.status(400).send({ message: "Email already in use" });
+          return res
+            .status(400)
+            .send({ success: false, message: "Email already in use" });
         } else {
           return res
             .status(400)
-            .send({ message: "Phone number already in use" });
+            .send({ success: false, message: "Phone number already in use" });
         }
       }
 
@@ -227,6 +199,7 @@ class AgentController extends BaseController {
       await transaction.commit();
 
       res.status(201).send({
+        success: true,
         message: "Agent registered successfully",
         ...agentResponse,
       });
@@ -234,6 +207,7 @@ class AgentController extends BaseController {
       console.error("Signup error:", error);
       if (transaction) await transaction.rollback();
       res.status(500).send({
+        success: false,
         message: "An error occurred during signup. Please try again later.",
       });
     }
@@ -244,6 +218,28 @@ class AgentController extends BaseController {
     const transaction = await sequelize.transaction();
     try {
       const { name, email, phone, password } = req.body;
+      // mandatory field check
+      if (!name) {
+        return res
+          .status(400)
+          .send({ success: false, message: "Name is required" });
+      }
+      if (!email) {
+        return res
+          .status(400)
+          .send({ success: false, message: "Email is required" });
+      }
+      if (phone) {
+        return res
+          .status(400)
+          .send({ success: false, message: "Phone is required" });
+      }
+      if (password) {
+        return res
+          .status(400)
+          .send({ success: false, message: "Password is required" });
+      }
+
       if (
         [name, email, phone, password].some((field) => field?.trim() === "")
       ) {
@@ -252,95 +248,37 @@ class AgentController extends BaseController {
           .send({ message: "Please provide all necessary fields" });
       }
 
+      // Validate name
+      const nameError = isValidLength(name);
+      if (nameError) {
+        return res.status(400).send({ success: false, message: nameError });
+      }
+
       if (!isValidEmail(email)) {
-        return res.status(400).send({ message: "Invalid email" });
+        return res
+          .status(400)
+          .send({ success: false, message: "Invalid email" });
       }
 
       if (!isValidPhone(phone)) {
-        return res.status(400).send({ message: "Invalid Phone Number" });
+        return res
+          .status(400)
+          .send({ success: false, message: "Invalid Phone Number" });
       }
 
       if (!isValidPassword(password)) {
         return res.status(400).send({
+          success: false,
           message:
             "Password must contain at least 8 characters, including uppercase, lowercase, number and special character",
         });
       }
 
-      if (!isValidLength(name)) {
-        return res.status(400).send({
-          message:
-            "Name should be greater than 3 characters and less than 40 characters and should not start with number",
-        });
-      }
-
       const hashedPassword = await bcrypt.hash(password, 10);
-      // Check for existing agent by email or phone
-      //       const existingAgentByEmail = await models.Agent.findOne({
-      //         where: { email },
-      //       });
-      //       const existingAgentByPhone = await models.Agent.findOne({
-      //         where: { phone },
-      //       });
-      //       let agent;
-      //       if (existingAgentByEmail && existingAgentByPhone) {
-      //         // Both email and phone already exist
-      //         return res.status(400).send({
-      //           message: "either email and phone number are already in use",
-      //         });
-      //       }
-
-      //       if (existingAgentByEmail) {
-      //         // Email exists but phone doesn't match
-      //         if (existingAgentByEmail.phone !== phone) {
-      //           return res.status(400).send({
-      //             message: "phone already in use",
-      //           });
-      //         }
-      //         // Update existing agent
-      //         existingAgentByEmail.name = name;
-      //         existingAgentByEmail.password = hashedPassword;
-      //         await existingAgentByEmail.save({ transaction });
-      //         agent = existingAgentByEmail;
-      //       } else if (existingAgentByPhone) {
-      //         // Phone exists but email doesn't match
-      //         return res.status(400).send({
-      //           message: "Phone number already in use",
-      //         });
-      //       } else {
-      //         // Create new agent
-      //         const emailToken = generateToken({ email });
-      //         agent = await models.Agent.create(
-      //           {
-      //             name,
-      //             email,
-      //             phone,
-      //             password: hashedPassword,
-      //             emailToken,
-      //             isEmailVerified: true,
-      //           },
-      //           { transaction }
-      //         );
-      //       }
-
-      //       await transaction.commit();
-      //       res.status(201).send({
-      //         id: agent.id,
-      //         email: agent.email,
-      //         phone: agent.phone,
-      //         isEmailVerified: agent.isEmailVerified,
-      //       });
-      //     } catch (error) {
-      //       await transaction.rollback();
-      //       res.status(500).send({
-      //         message: error.message || "Some error occurred during signup.",
-      //       });
-      //     }
-      //   };
       const existingAgent = await models.Agent.findOne(
         {
           where: {
-            [Op.or]: [{ email: email.toLowerCase() }, { phone }],
+            [Op.or]: [{ email: email.toLowerCase() }, { phone: phone }],
           },
         },
         { transaction }
@@ -353,14 +291,17 @@ class AgentController extends BaseController {
           existingAgent.phone === phone
         ) {
           return res.status(400).send({
+            success: false,
             message: "Both email and phone number are already in use",
           });
         } else if (existingAgent.email.toLowerCase() === email.toLowerCase()) {
-          return res.status(400).send({ message: "Email already in use" });
+          return res
+            .status(400)
+            .send({ success: false, message: "Email already in use" });
         } else {
           return res
             .status(400)
-            .send({ message: "Phone number already in use" });
+            .send({ success: false, message: "Phone number already in use" });
         }
       }
 
@@ -386,6 +327,7 @@ class AgentController extends BaseController {
       await transaction.commit();
 
       res.status(201).send({
+        success: true,
         message: "Agent registered successfully",
         ...agentResponse,
       });
@@ -393,6 +335,7 @@ class AgentController extends BaseController {
       console.error("Signup error:", error);
       if (transaction) await transaction.rollback();
       res.status(500).send({
+        success: false,
         message: "An error occurred during signup. Please try again later.",
       });
     }
@@ -400,8 +343,13 @@ class AgentController extends BaseController {
 
   //   Email OTP verification
   emailOtpVerification = async (req, res) => {
-    const { phone, otp } = req.body;
-
+    const { email, otp } = req.body;
+    // Validate the Email
+    if (!email) {
+      return res
+        .status(400)
+        .json({ success: false, message: "OTP is required." });
+    }
     // Validate the OTP
     if (!otp) {
       return res
@@ -410,7 +358,9 @@ class AgentController extends BaseController {
     }
 
     try {
-      const agent = await models.Agent.findOne({ where: { phone } });
+      const agent = await models.Agent.findOne({
+        where: { email: email.trim() },
+      });
       console.log(agent);
       if (!agent) {
         return res.status(400).json({
@@ -460,23 +410,36 @@ class AgentController extends BaseController {
     if ([email, password].some((field) => field?.trim() === "")) {
       return res
         .status(400)
-        .send({ message: "Please provide all necessary fields" });
+        .send({
+          success: false,
+          message: "Please provide all necessary fields",
+        });
     }
     if (!email || !password) {
-      return res.status(400).send({ message: "Please Enter Email & Password" });
+      return res
+        .status(400)
+        .send({ success: false, message: "Please Enter Email & Password" });
     }
     try {
-      const agent = await models.Agent.findOne({ where: { email } });
+      const agent = await models.Agent.findOne({
+        where: { email: email.trim() },
+      });
       if (!agent) {
-        return res.status(404).send({ message: "Agent not found." });
+        return res
+          .status(404)
+          .send({ success: false, message: "Agent not found." });
       }
       if (!agent.isEmailVerified) {
-        return res.status(400).send({ message: "agent is not verified" });
+        return res
+          .status(400)
+          .send({ success: false, message: "agent is not verified" });
       }
 
       const isPasswordValid = await bcrypt.compare(password, agent.password);
       if (!isPasswordValid) {
-        return res.status(403).send({ message: "Invalid password." });
+        return res
+          .status(403)
+          .send({ success: false, message: "Invalid password." });
       }
 
       const obj = {
@@ -488,11 +451,14 @@ class AgentController extends BaseController {
       const token = generateToken(obj);
 
       res.status(200).send({
+        success: true,
+        message: "Agent Login Successfully",
         id: agent.id,
         token: token,
       });
     } catch (error) {
       res.status(500).send({
+        success: false,
         message: error.message || "Some error occurred during signin.",
       });
     }
@@ -526,11 +492,15 @@ class AgentController extends BaseController {
 
     // Validate input fields
     if (!email) {
-      return res.status(400).send({ message: "Missing email id" });
+      return res
+        .status(400)
+        .send({ success: false, message: "Missing email id" });
     }
 
     if (!isValidEmail(email)) {
-      return res.status(400).send({ message: "Invalid email address" });
+      return res
+        .status(400)
+        .send({ success: false, message: "Invalid email address" });
     }
 
     try {
@@ -542,10 +512,14 @@ class AgentController extends BaseController {
       });
 
       if (!agent) {
-        return res.status(404).send({ message: "Agent not found" });
+        return res
+          .status(404)
+          .send({ success: false, message: "Agent not found" });
       }
       if (!agent.isEmailVerified) {
-        return res.status(400).send({ message: "Agent is not verified" });
+        return res
+          .status(400)
+          .send({ success: false, message: "Agent is not verified" });
       }
 
       // Get ResetPassword Token
@@ -573,7 +547,7 @@ class AgentController extends BaseController {
       agent.otpExpire = null;
       await agent.save({ validate: false });
 
-      return res.status(500).send(error.message);
+      return res.status(500).send({ success: false, message: error.message });
     }
   };
 
@@ -586,7 +560,15 @@ class AgentController extends BaseController {
     if (!password || !otp) {
       return res
         .status(400)
-        .send({ message: "Missing required fields: password or OTP" });
+        .send({
+          success: false,
+          message: "Missing required fields: password or OTP",
+        });
+    }
+    if (!agentId) {
+      return res
+        .status(400)
+        .send({ success: false, message: "Missing AgentId in the params" });
     }
     const hashedPassword = await bcrypt.hash(password, 10);
 
@@ -595,15 +577,17 @@ class AgentController extends BaseController {
       const agent = await models.Agent.findByPk(agentId);
 
       if (!agent) {
-        return res.status(400).send({ message: "Agent not found" });
+        return res
+          .status(400)
+          .send({ success: false, message: "Agent not found" });
       }
 
       // Verify the OTP
       if (agent.otp !== otp.trim()) {
-        return res.status(400).send({ message: "Invalid OTP" });
+        return res.status(400).send({ success: false, message: "Invalid OTP" });
       }
       if (agent.otpExpire < Date.now()) {
-        return res.status(400).send({ message: "expired OTP" });
+        return res.status(400).send({ success: false, message: "expired OTP" });
       }
 
       // Update the agent's password and clear OTP fields
@@ -625,31 +609,33 @@ class AgentController extends BaseController {
         message: `Password updated for ${updatedAgent.email}`,
       });
     } catch (error) {
-      return res.status(500).send(error.message);
+      return res.status(500).send({ success: false, message: error.message });
     }
   };
 
   // send OTP
   sendOtp = async (req, res) => {
-    const { phone } = req.body;
+    const { email } = req.body;
 
-    if (!phone) {
-      return res.status(400).send({ message: "Missing phone" });
+    if (!email) {
+      return res.status(400).send({ success: false, message: "Missing Email" });
     }
 
-    if (!isValidPhone(phone)) {
-      return res.status(400).send({ message: "Invalid phone" });
+    if (!isValidEmail(email)) {
+      return res.status(400).send({ message: "Invalid Email" });
     }
 
     try {
       const agent = await models.Agent.findOne({
         where: {
-          phone: phone.trim(),
+          phone: email.trim(),
         },
       });
 
       if (!agent) {
-        return res.status(404).send({ message: "Agent not found" });
+        return res
+          .status(404)
+          .send({ success: false, message: "Agent not found" });
       }
 
       const otp = generateOtp();
@@ -678,10 +664,113 @@ class AgentController extends BaseController {
         await agent.save({ validate: false });
 
         console.error("Failed to send OTP email:", emailError);
-        return res.status(500).send(emailError.message);
+        return res
+          .status(500)
+          .send({ success: false, message: emailError.message });
       }
     } catch (error) {
-      return res.status(500).send(error.message);
+      return res.status(500).send({ success: false, message: error.message });
+    }
+  };
+  updateAgentByAdmin = async (req, res) => {
+    try {
+      const id = req.params.id;
+
+      if ("password" in req.body) {
+        return res
+          .status(400)
+          .json({
+            success: false,
+            error: "Password cannot be updated by Admin",
+          });
+      }
+
+      const [updatedRows] = await this.model.update(req.body, {
+        where: { id: id },
+      });
+
+      if (updatedRows > 0) {
+        const updatedItem = await this.model.findByPk(id, {
+          attributes: { exclude: ["password"] },
+        });
+        res.json({
+          success: true,
+          message: "updated successfully by admin",
+          data: updatedItem,
+        });
+      } else {
+        res.status(404).json({ success: false, error: "Item not found" });
+      }
+    } catch (error) {
+      res.status(500).json({ success: false, error: error.message });
+    }
+  };
+  updateByAgent = async (req, res) => {
+    try {
+      const id = req.params.id;
+      const { name } = req.body;
+
+      // Check if only name is provided
+      if (
+        Object.keys(req.body).length !== 1 ||
+        !req.body.hasOwnProperty("name")
+      ) {
+        return res
+          .status(400)
+          .json({ success: false, error: "Only name field can be updated" });
+      }
+      // mandatory field check
+      if (!name) {
+        return res
+          .status(400)
+          .send({ success: false, message: "Name is required" });
+      }
+      // Validate input fields
+      if ([name].some((field) => field?.trim() === "")) {
+        return res.status(400).send({
+          success: false,
+          message: "Please provide all necessary fields",
+        });
+      }
+      // Validate name
+      const nameError = isValidLength(name);
+      if (nameError) {
+        return res.status(400).send({ success: false, message: nameError });
+      }
+      const [updated] = await models.Agent.update(
+        { name: name.trim() },
+        {
+          where: { id: id },
+        }
+      );
+
+      if (updated) {
+        const updatedItem = await models.Agent.findByPk(id, {
+          attributes: { exclude: ["password"] },
+        });
+
+        if (!updatedItem) {
+          return res
+            .status(404)
+            .json({ success: false, error: "Item not found after update" });
+        }
+
+        res.json({
+          success: true,
+          message: "updated successfully by agent",
+          data: updatedItem,
+        });
+      } else {
+        res.status(404).json({ success: false, error: "Item not found" });
+      }
+    } catch (error) {
+      console.error("Update error:", error);
+      res
+        .status(500)
+        .json({
+          success: false,
+          error: "An error occurred while updating the item",
+        });
     }
   };
 }

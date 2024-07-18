@@ -57,6 +57,13 @@ class OrganizationController extends BaseController {
     );
     this.router.post("/sendOtp", this.sendOtp.bind(this));
     this.router.post("/otpVerification", this.emailOtpVerification.bind(this));
+    this.router.put(
+      "/updateByAdmin/:id",
+      authenticate,
+      authorizeAdmin,
+      this.updateByAdmin.bind(this)
+    );
+    this.router.put("/updateByOrganization/:id", this.updateByOrganization.bind(this));
   }
 
   listArgVerify(req, res, queryOptions) {
@@ -97,6 +104,48 @@ class OrganizationController extends BaseController {
         password,
         location,
       } = req.body;
+      // mandatory field check
+      if (!name) {
+        return res
+          .status(400)
+          .send({ success: false, message: "Name is required" });
+      }
+      if (!type) {
+        return res
+          .status(400)
+          .send({ success: false, message: "Type is required" });
+      }
+      if (!description) {
+        return res
+          .status(400)
+          .send({ success: false, message: "Description is required" });
+      }
+      if (!contact_person_name) {
+        return res
+          .status(400)
+          .send({ success: false, message: "Contact Person Name is required" });
+      }
+      if (!email) {
+        return res
+          .status(400)
+          .send({ success: false, message: "Email is required" });
+      }
+      if (!phone) {
+        return res
+          .status(400)
+          .send({ success: false, message: "Phone is required" });
+      }
+      if (!password) {
+        return res
+          .status(400)
+          .send({ success: false, message: "Password is required" });
+      }
+      if (!location) {
+        return res
+          .status(400)
+          .send({ success: false, message: "Location is required" });
+      }
+
       // Validate input fields
       if (
         [
@@ -109,38 +158,43 @@ class OrganizationController extends BaseController {
           location,
         ].some((field) => field?.trim() === "")
       ) {
+        return res.status(400).send({
+          success: false,
+          message: "Please provide all necessary fields",
+        });
+      }
+
+      // Validate name
+      const nameError = isValidLength(name);
+      if (nameError) {
+        return res.status(400).send({ success: false, message: nameError });
+      }
+      // validate contact person name
+      const contactPersonNameError = isValidLength(contact_person_name);
+      if (contactPersonNameError) {
         return res
           .status(400)
-          .send({ message: "Please provide all necessary fields" });
+          .send({ success: false, message: contactPersonNameError });
       }
       if (!isValidPhone(phone)) {
-        return res.status(400).send({ message: "Invalid Phone Number" });
+        return res
+          .status(400)
+          .send({ success: false, message: "Invalid Phone Number" });
       }
 
       if (!isValidEmail(email)) {
-        return res.status(400).send({ message: "Invalid email" });
+        return res
+          .status(400)
+          .send({ success: false, message: "Invalid email" });
       }
 
       if (!isValidPassword(password)) {
         return res.status(400).send({
+          success: false,
           message:
             "Password must contain at least 8 characters, including uppercase, lowercase, number and special character",
         });
       }
-
-      if (!isValidLength(name)) {
-        return res.status(400).send({
-          message:
-            "Name should be greater than 3 characters and less than 40 characters and should not start with number",
-        });
-      }
-      if (!isValidLength(contact_person_name)) {
-        return res.status(400).send({
-          message:
-            "Name should be greater than 3 characters and less than 40 characters and should not start with number",
-        });
-      }
-
       const hashedPassword = await bcrypt.hash(password, 10);
 
       // Check for existing organization by email or phone
@@ -224,16 +278,19 @@ class OrganizationController extends BaseController {
           existingOrganization.phone === phone
         ) {
           return res.status(400).send({
+            success: false,
             message: "Both email and phone number are already in use",
           });
         } else if (
           existingOrganization.email.toLowerCase() === email.toLowerCase()
         ) {
-          return res.status(400).send({ message: "Email already in use" });
+          return res
+            .status(400)
+            .send({ success: false, message: "Email already in use" });
         } else {
           return res
             .status(400)
-            .send({ message: "Phone number already in use" });
+            .send({ success: false, message: "Phone number already in use" });
         }
       }
 
@@ -262,6 +319,7 @@ class OrganizationController extends BaseController {
       await transaction.commit();
 
       res.status(201).send({
+        success: true,
         message: "Organization registered successfully",
         ...organizationResponse,
       });
@@ -269,6 +327,7 @@ class OrganizationController extends BaseController {
       console.error("Signup error:", error);
       if (transaction) await transaction.rollback();
       res.status(500).send({
+        success: false,
         message: "An error occurred during signup. Please try again later.",
       });
     }
@@ -287,6 +346,48 @@ class OrganizationController extends BaseController {
         password,
         location,
       } = req.body;
+
+      // mandatory field check
+      if (!name) {
+        return res
+          .status(400)
+          .send({ success: false, message: "Name is required" });
+      }
+      if (!type) {
+        return res
+          .status(400)
+          .send({ success: false, message: "Type is required" });
+      }
+      if (!description) {
+        return res
+          .status(400)
+          .send({ success: false, message: "Description is required" });
+      }
+      if (!contact_person_name) {
+        return res
+          .status(400)
+          .send({ success: false, message: "Contact Person Name is required" });
+      }
+      if (!email) {
+        return res
+          .status(400)
+          .send({ success: false, message: "Email is required" });
+      }
+      if (!phone) {
+        return res
+          .status(400)
+          .send({ success: false, message: "Phone is required" });
+      }
+      if (!password) {
+        return res
+          .status(400)
+          .send({ success: false, message: "Password is required" });
+      }
+      if (!location) {
+        return res
+          .status(400)
+          .send({ success: false, message: "Location is required" });
+      }
       // Validate input fields
       if (
         [
@@ -299,107 +400,46 @@ class OrganizationController extends BaseController {
           location,
         ].some((field) => field?.trim() === "")
       ) {
+        return res.status(400).send({
+          success: false,
+          message: "Please provide all necessary fields",
+        });
+      }
+      // Validate name
+      const nameError = isValidLength(name);
+      if (nameError) {
+        return res.status(400).send({ success: false, message: nameError });
+      }
+      // validate contact person name
+      const contactPersonNameError = isValidLength(contact_person_name);
+      if (contactPersonNameError) {
         return res
           .status(400)
-          .send({ message: "Please provide all necessary fields" });
+          .send({ success: false, message: contactPersonNameError });
       }
+      // validate phone
       if (!isValidPhone(phone)) {
-        return res.status(400).send({ message: "Invalid Phone Number" });
+        return res
+          .status(400)
+          .send({ success: false, message: "Invalid Phone Number" });
       }
-
+      // validate email
       if (!isValidEmail(email)) {
-        return res.status(400).send({ message: "Invalid email" });
+        return res
+          .status(400)
+          .send({ success: false, message: "Invalid email" });
       }
-
+      // validate password
       if (!isValidPassword(password)) {
         return res.status(400).send({
+          success: false,
           message:
             "Password must contain at least 8 characters, including uppercase, lowercase, number and special character",
         });
       }
-
-      if (!isValidLength(name)) {
-        return res.status(400).send({
-          message:
-            "Name should be greater than 3 characters and less than 40 characters and should not start with number",
-        });
-      }
-      if (!isValidLength(contact_person_name)) {
-        return res.status(400).send({
-          message:
-            "contact person name should be greater than 3 characters and less than 40 characters and should not start with number",
-        });
-      }
-
+      // hash password
       const hashedPassword = await bcrypt.hash(password, 10);
-
-      // Check for existing organization by email or phone
-      //       const existingOrganizationByEmail = await models.Organization.findOne({
-      //         where: { email },
-      //       });
-      //       const existingOrganizationByPhone = await models.Organization.findOne({
-      //         where: { phone },
-      //       });
-      //       let organization;
-      //       if (existingOrganizationByEmail && existingOrganizationByPhone) {
-      //         // Both email and phone already exist
-      //         return res.status(400).send({
-      //           message: "either email and phone number are already in use",
-      //         });
-      //       }
-
-      //       if (existingOrganizationByEmail) {
-      //         // Email exists but phone doesn't match
-      //         if (existingOrganizationByEmail.phone !== phone) {
-      //           return res.status(400).send({
-      //             message: "phone already in use",
-      //           });
-      //         }
-      //         // Update existing organization
-      //         existingOrganizationByEmail.name = name;
-      //         existingOrganizationByEmail.password = hashedPassword;
-      //         await existingOrganizationByEmail.save({ transaction });
-      //         organization = existingOrganizationByEmail;
-      //       } else if (existingOrganizationByPhone) {
-      //         // Phone exists but email doesn't match
-      //         return res.status(400).send({
-      //           message: "Phone number already in use",
-      //         });
-      //       } else {
-      //         // Create new organization
-      //         const emailToken = generateToken({ email });
-      //         organization = await models.Organization.create(
-      //           {
-      //             name,
-      //             type,
-      //             description,
-      //             contact_person_name,
-      //             email,
-      //             phone,
-      //             password: hashedPassword,
-      //             location,
-      //             emailToken,
-      //             isEmailVerified: true,
-      //           },
-      //           { transaction }
-      //         );
-      //       }
-
-      //       await transaction.commit();
-      //       res.status(201).send({
-      //         id: organization.id,
-      //         name: organization.name,
-      //         email: organization.email,
-      //         phone: organization.phone,
-      //         isEmailVerified: organization.isEmailVerified,
-      //       });
-      //     } catch (error) {
-      //       await transaction.rollback();
-      //       res.status(500).send({
-      //         message: error.message || "Some error occurred during signup.",
-      //       });
-      //     }
-      //   };
+      // DB call
       const existingOrganization = await models.Organization.findOne(
         {
           where: {
@@ -409,7 +449,7 @@ class OrganizationController extends BaseController {
         { transaction }
       );
       console.log(existingOrganization);
-
+      // existing user check
       if (existingOrganization) {
         await transaction.rollback();
         if (
@@ -417,16 +457,19 @@ class OrganizationController extends BaseController {
           existingOrganization.phone === phone
         ) {
           return res.status(400).send({
+            success: false,
             message: "Both email and phone number are already in use",
           });
         } else if (
           existingOrganization.email.toLowerCase() === email.toLowerCase()
         ) {
-          return res.status(400).send({ message: "Email already in use" });
+          return res
+            .status(400)
+            .send({ success: false, message: "Email already in use" });
         } else {
           return res
             .status(400)
-            .send({ message: "Phone number already in use" });
+            .send({ success: false, message: "Phone number already in use" });
         }
       }
 
@@ -456,6 +499,7 @@ class OrganizationController extends BaseController {
       await transaction.commit();
 
       res.status(201).send({
+        success: true,
         message: "Organization registered successfully",
         ...organizationResponse,
       });
@@ -463,13 +507,14 @@ class OrganizationController extends BaseController {
       console.error("Signup error:", error);
       if (transaction) await transaction.rollback();
       res.status(500).send({
+        success: false,
         message: "An error occurred during signup. Please try again later.",
       });
     }
   };
   //   Email OTP verification
   emailOtpVerification = async (req, res) => {
-    const { phone, otp } = req.body;
+    const { email, otp } = req.body;
 
     // Validate the OTP
     if (!otp) {
@@ -477,10 +522,15 @@ class OrganizationController extends BaseController {
         .status(400)
         .json({ success: false, message: "OTP is required." });
     }
+    if (!email) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Email is required." });
+    }
 
     try {
       const organization = await models.Organization.findOne({
-        where: { phone },
+        where: { email: email.trim() },
       });
       console.log(organization);
       if (!organization) {
@@ -528,24 +578,29 @@ class OrganizationController extends BaseController {
   signin = async (req, res) => {
     const { email, password } = req.body;
     if ([email, password].some((field) => field?.trim() === "")) {
-      return res
-        .status(400)
-        .send({ message: "Please provide all necessary fields" });
+      return res.status(400).send({
+        success: false,
+        message: "Please provide all necessary fields",
+      });
     }
     if (!email || !password) {
-      return res.status(400).send({ message: "Please Enter Email & Password" });
+      return res
+        .status(400)
+        .send({ success: false, message: "Please Enter Email & Password" });
     }
     try {
       const organization = await models.Organization.findOne({
-        where: { email },
+        where: { email: email.trim() },
       });
       if (!organization) {
-        return res.status(404).send({ message: "Organization not found." });
+        return res
+          .status(404)
+          .send({ success: false, message: "Organization not found." });
       }
       if (!organization.isEmailVerified) {
         return res
           .status(400)
-          .send({ message: "Organization is not verified" });
+          .send({ success: false, message: "Organization is not verified" });
       }
 
       const isPasswordValid = await bcrypt.compare(
@@ -553,7 +608,9 @@ class OrganizationController extends BaseController {
         organization.password
       );
       if (!isPasswordValid) {
-        return res.status(403).send({ message: "Invalid password." });
+        return res
+          .status(403)
+          .send({ success: false, message: "Invalid password." });
       }
 
       const obj = {
@@ -565,11 +622,14 @@ class OrganizationController extends BaseController {
       const token = generateToken(obj);
 
       res.status(200).send({
+        success: true,
+        message: "Organization login successfully",
         id: organization.id,
         token: token,
       });
     } catch (error) {
       res.status(500).send({
+        success: false,
         message: error.message || "Some error occurred during signin.",
       });
     }
@@ -583,15 +643,20 @@ class OrganizationController extends BaseController {
       const organization = await models.Organization.findByPk(decoded.obj.id);
 
       if (!organization) {
-        return res.status(404).send({ message: "Organization not found." });
+        return res
+          .status(404)
+          .send({ status: false, message: "Organization not found." });
       }
 
       organization.isEmailVerified = true;
       await organization.save();
 
-      res.status(200).send({ message: "Email verified successfully." });
+      res
+        .status(200)
+        .send({ success: true, message: "Email verified successfully." });
     } catch (error) {
       res.status(500).send({
+        success: false,
         message: error.message || "Could not verify email.",
       });
     }
@@ -602,11 +667,15 @@ class OrganizationController extends BaseController {
 
     // Validate input fields
     if (!email) {
-      return res.status(400).send({ message: "Missing email id" });
+      return res
+        .status(400)
+        .send({ success: false, message: "Missing email id" });
     }
 
     if (!isValidEmail(email)) {
-      return res.status(400).send({ message: "Invalid email address" });
+      return res
+        .status(400)
+        .send({ success: false, message: "Invalid email address" });
     }
 
     try {
@@ -618,12 +687,14 @@ class OrganizationController extends BaseController {
       });
 
       if (!organization) {
-        return res.status(404).send({ message: "Organization not found" });
+        return res
+          .status(404)
+          .send({ success: false, message: "Organization not found" });
       }
       if (!organization.isEmailVerified) {
         return res
           .status(400)
-          .send({ message: "Organization is not verified" });
+          .send({ success: false, message: "Organization is not verified" });
       }
 
       // Get ResetPassword Token
@@ -651,7 +722,7 @@ class OrganizationController extends BaseController {
       organization.otpExpire = null;
       await organization.save({ validate: false });
 
-      return res.status(500).send(error.message);
+      return res.status(500).send({ success: false, message: error.message });
     }
   };
 
@@ -662,9 +733,16 @@ class OrganizationController extends BaseController {
 
     // Validate input fields
     if (!password || !otp) {
-      return res
-        .status(400)
-        .send({ message: "Missing required fields: password or OTP" });
+      return res.status(400).send({
+        success: false,
+        message: "Missing required fields: password or OTP",
+      });
+    }
+    if (organizationId) {
+      return res.status(400).send({
+        success: false,
+        message: "Missing organizationId in the params",
+      });
     }
     const hashedPassword = await bcrypt.hash(password, 10);
     try {
@@ -672,15 +750,17 @@ class OrganizationController extends BaseController {
       const organization = await models.Organization.findByPk(organizationId);
 
       if (!organization) {
-        return res.status(400).send({ message: "Organization not found" });
+        return res
+          .status(400)
+          .send({ success: false, message: "Organization not found" });
       }
 
       // Verify the OTP
       if (organization.otp !== otp.trim()) {
-        return res.status(400).send({ message: "Invalid OTP" });
+        return res.status(400).send({ success: false, message: "Invalid OTP" });
       }
       if (organization.otpExpire < Date.now()) {
-        return res.status(400).send({ message: "expired OTP" });
+        return res.status(400).send({ success: false, message: "expired OTP" });
       }
 
       // Update the organization's password and clear OTP fields
@@ -705,31 +785,33 @@ class OrganizationController extends BaseController {
         message: `Password updated for ${updatedOrganization.email}`,
       });
     } catch (error) {
-      return res.status(500).send(error.message);
+      return res.status(500).send({ success: false, message: error.message });
     }
   };
 
   // send OTP
   sendOtp = async (req, res) => {
-    const { phone } = req.body;
+    const { email } = req.body;
 
-    if (!phone) {
-      return res.status(400).send({ message: "Missing phone" });
+    if (!email) {
+      return res.status(400).send({ success: false, message: "Missing Email" });
     }
 
-    if (!isValidPhone(phone)) {
-      return res.status(400).send({ message: "Invalid phone" });
+    if (!isValidEmail(email)) {
+      return res.status(400).send({ success: false, message: "Invalid Email" });
     }
 
     try {
       const organization = await models.Organization.findOne({
         where: {
-          phone: phone.trim(),
+          email: email.trim(),
         },
       });
 
       if (!organization) {
-        return res.status(404).send({ message: "Organization not found" });
+        return res
+          .status(404)
+          .send({ success: false, message: "Organization not found" });
       }
 
       const otp = generateOtp();
@@ -758,10 +840,122 @@ class OrganizationController extends BaseController {
         await organization.save({ validate: false });
 
         console.error("Failed to send OTP email:", emailError);
-        return res.status(500).send(emailError.message);
+        return res
+          .status(500)
+          .send({ success: false, message: emailError.message });
       }
     } catch (error) {
-      return res.status(500).send(error.message);
+      return res.status(500).send({ success: false, message: error.message });
+    }
+  };
+  updateByAdmin = async (req, res) => {
+    try {
+      const id = req.params.id;
+
+      if ("password" in req.body) {
+        return res.status(400).json({
+          success: false,
+          error: "Password cannot be updated by Admin",
+        });
+      }
+
+      const [updatedRows] = await models.Organization.update(req.body, {
+        where: { id: id },
+      });
+
+      if (updatedRows > 0) {
+        const updatedItem = await models.Organization.findByPk(id, {
+          attributes: { exclude: ["password"] },
+        });
+        res.json({
+          success: true,
+          message: "updated successfully by admin",
+          data: updatedItem,
+        });
+      } else {
+        res.status(404).json({ success: false, error: "Item not found" });
+      }
+    } catch (error) {
+      res.status(500).json({ success: false, error: error.message });
+    }
+  };
+  updateByOrganization = async (req, res) => {
+    try {
+      const id = req.params.id;
+      const { name, contact_person_name } = req.body;
+
+      // Check if only name is provided
+      if (
+        !req.body.hasOwnProperty("name") ||
+        !req.body.hasOwnProperty("contact_person_name")
+      ) {
+        return res.status(400).json({
+          success: false,
+          error: "Only name or contact person name field can be updated",
+        });
+      }
+      // mandatory field check
+      if (!name) {
+        return res
+          .status(400)
+          .send({ success: false, message: "Name is required" });
+      }
+      if (!contact_person_name) {
+        return res
+          .status(400)
+          .send({ success: false, message: "Contact Person Name is required" });
+      }
+      // Validate input fields
+      if ([name, contact_person_name].some((field) => field?.trim() === "")) {
+        return res.status(400).send({
+          success: false,
+          message: "Please provide all necessary fields",
+        });
+      }
+      // Validate name
+      const nameError = isValidLength(name);
+      if (nameError) {
+        return res.status(400).send({ success: false, message: nameError });
+      }
+      // validate contact person name
+      const contactPersonNameError = isValidLength(contact_person_name);
+      if (contactPersonNameError) {
+        return res
+          .status(400)
+          .send({ success: false, message: contactPersonNameError });
+      }
+      const [updated] = await models.Organization.update(
+        { name: name.trim(),contact_person_name:contact_person_name.trim() },
+        {
+          where: { id: id },
+        }
+      );
+
+      if (updated) {
+        const updatedItem = await models.Organization.findByPk(id, {
+          attributes: { exclude: ["password"] },
+        });
+
+        if (!updatedItem) {
+          return res
+            .status(404)
+            .json({ success: false, error: "Item not found after update" });
+        }
+
+        res.json({
+          success: true,
+          message: "updated successfully by agent",
+          data: updatedItem,
+        });
+      } else {
+        res.status(404).json({ success: false, error: "Item not found" });
+      }
+    } catch (error) {
+      console.error("Update error:", error);
+      res.status(500).json({
+        success: false,
+        error: "An error occurred while updating the item",
+      });
     }
   };
 }

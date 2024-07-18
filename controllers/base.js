@@ -18,7 +18,6 @@ class BaseController {
     this.router.post('/', this.create.bind(this));
     this.router.put('/:id', this.update.bind(this));
     this.router.put('/update/:id',authenticate ,authorizeAdminOrOrganization,this.updateJobPost.bind(this))
-    this.router.put('/updateByAdmin/:id',authenticate, authorizeAdmin, this.update.bind(this));
     this.router.delete('/:id', this.delete.bind(this));
     this.router.delete('/deletedByAdmin/:id',authenticate, authorizeAdmin, this.delete.bind(this));
   }
@@ -83,6 +82,7 @@ class BaseController {
       const results = await this.model.findAndCountAll(queryOptions);
 
       res.json({
+        success:true,
         data: results.rows,
         total: results.count,
         totalPages: Math.ceil(results.count / limit),
@@ -107,6 +107,7 @@ class BaseController {
       });
 
       res.json({
+        success:true,
         data: results.rows,
         total: results.count,
         totalPages: Math.ceil(results.count / limit),
@@ -196,7 +197,7 @@ class BaseController {
         });
         res.json(updatedItem);
       } else {
-        res.status(404).json({ error: 'Item not found' });
+        res.status(404).json({success:false, error: 'Item not found' });
       }
     } catch (error) {
       res.status(500).json({ error: error.message });
