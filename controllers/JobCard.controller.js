@@ -9,7 +9,7 @@ const sequelize = require("../config/db.config").sequelize;
 class JobCardController extends BaseController {
   constructor() {
     super(models.JobCard);
-    
+
     // Add a new route for getting JobCards by JobPostId
     this.router.get('/byJobPost/:jobPostId', this.getByJobPostId.bind(this));
   }
@@ -39,7 +39,7 @@ class JobCardController extends BaseController {
     } catch (error) {
       res.status(500).json({ error: error.message });
     }
-  }
+  };
 }
 
 module.exports = new JobCardController();

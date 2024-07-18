@@ -1,9 +1,10 @@
 const db = require('../config/db.config.js');
 const axios = require('axios');
 const sequelize = db.sequelize;
+const { Op } = require("sequelize");
 const express = require('express');
 const models = require('../models');
-const { authenticate, authorizeAdmin ,authorizeAdminOrOrganization} = require("../controllers/auth");
+const { authenticate, authorizeAdmin, authorizeAdminOrOrganization } = require("../controllers/auth");
 class BaseController {
   constructor(model) {
     this.model = model;
@@ -17,9 +18,10 @@ class BaseController {
     this.router.get('/:id', this.read.bind(this));
     this.router.post('/', this.create.bind(this));
     this.router.put('/:id', this.update.bind(this));
-    this.router.put('/update/:id',authenticate ,authorizeAdminOrOrganization,this.updateJobPost.bind(this))
+    this.router.put('/update/:id', authenticate, authorizeAdminOrOrganization, this.updateJobPost.bind(this))
     this.router.delete('/:id', this.delete.bind(this));
-    this.router.delete('/deletedByAdmin/:id',authenticate, authorizeAdmin, this.delete.bind(this));
+    this.router.get('/filter/Item', this.filter.bind(this));
+    this.router.delete('/deletedByAdmin/:id', authenticate, authorizeAdmin, this.delete.bind(this));
   }
 
   listArgVerify(req, res, queryOptions) {
@@ -32,10 +34,10 @@ class BaseController {
 
   async listWithReferences(req, res) {
     try {
-      const{page=1 ,limit}=req.query;
+      const { page = 1, limit } = req.query;
       const { user, attributes, include, where } = req.body;
-const pageValue=parseInt(page,10)
-const limitValue=parseInt(limit,10)
+      const pageValue = parseInt(page, 10)
+      const limitValue = parseInt(limit, 10)
       const offset = (pageValue - 1) * limitValue;
 
       let validAttributes = attributes ? attributes.filter(attr => this.validAttributesCache.has(attr)) : null;
@@ -84,7 +86,7 @@ const limitValue=parseInt(limit,10)
       const results = await this.model.findAndCountAll(queryOptions);
 
       res.json({
-        success:true,
+        success: true,
         data: results.rows,
         total: results.count,
         totalPages: Math.ceil(results.count / limitValue),
@@ -109,7 +111,7 @@ const limitValue=parseInt(limit,10)
       });
 
       res.json({
-        success:true,
+        success: true,
         data: results.rows,
         total: results.count,
         totalPages: Math.ceil(results.count / limit),
@@ -199,33 +201,33 @@ const limitValue=parseInt(limit,10)
         });
         res.json(updatedItem);
       } else {
-        res.status(404).json({success:false, error: 'Item not found' });
+        res.status(404).json({ success: false, error: 'Item not found' });
       }
     } catch (error) {
       res.status(500).json({ error: error.message });
     }
   }
-   async updateJobPost(req, res) {
+  async updateJobPost(req, res) {
     let transaction;
     try {
       transaction = await sequelize.transaction();
-  
+
       const { id } = req.params;
       const { jobCards, ...updatedJobPostData } = req.body;
-  
+
       const jobPost = await this.model.findByPk(id, {
         include: [{ model: models.JobCard, as: 'cards' }],
         transaction,
       });
-  
+
       if (!jobPost) {
         await transaction.rollback();
         return res.status(404).json({ error: 'JobPost not found' });
       }
-  
+
       // Update the JobPost fields
       await jobPost.update(updatedJobPostData, { transaction });
-  
+
       // Update existing JobCards with common fields
       await Promise.all(
         jobPost.cards.map(async (jobCard) => {
@@ -241,14 +243,14 @@ const limitValue=parseInt(limit,10)
           );
         })
       );
-  
+
       // If new jobCards are provided, append them to the existing jobCards
       if (jobCards && jobCards.length > 0) {
         const currentJobCards = jobPost.jobCards || [];
         const updatedJobCards = [...currentJobCards, ...jobCards];
-  
+
         await jobPost.update({ jobCards: updatedJobCards }, { transaction });
-  
+
         // Create new JobCard entries
         const newJobCardEntries = jobCards.map(jobCardData => ({
           job_title: jobPost.job_title,
@@ -261,20 +263,20 @@ const limitValue=parseInt(limit,10)
           OrganizationId: jobPost.OrganizationId,
           AdminId: jobPost.AdminId,
         }));
-  
+
         await models.JobCard.bulkCreate(newJobCardEntries, { transaction });
       }
-  
+
       await transaction.commit();
-      
+
       // Fetch the updated JobPost with associated JobCards
       const finalUpdatedJobPost = await this.model.findByPk(id, {
-        include: [{ 
+        include: [{
           model: models.JobCard,
           as: 'cards'  // Make sure this alias matches your association
         }],
       });
-  
+
       res.status(200).json(finalUpdatedJobPost);
     } catch (error) {
       console.error('Error in updateJobPost:', error);
@@ -293,7 +295,7 @@ const limitValue=parseInt(limit,10)
       });
 
       if (deleted) {
-       return res.status(200).json({message:"item deleted"});
+        return res.status(200).json({ message: "item deleted" });
       } else {
         res.status(404).json({ error: 'Item not found' });
       }
@@ -301,6 +303,50 @@ const limitValue=parseInt(limit,10)
       res.status(500).json({ error: error.message });
     }
   }
+  async filter(req, res) {
+    // const { id } = req.params;
+
+    const { due_date, status, priority } = req.query;
+    console.log(req.query);
+    let whereClause = {};
+    let order = [];
+
+    // Build dynamic where clause and order
+    if (due_date) {
+      whereClause.due_date = due_date;
+      order.push(['due_date', 'DESC']);
+    }
+    if (status) {
+      whereClause.status = status;
+      order.push(['status', 'DESC']);
+    }
+    if (priority) {
+      whereClause.priority = priority;
+      order.push(['priority', 'DESC']);
+    }
+
+    try {
+      // First, get tasks that match the query
+      const matchingTasks = await this.model.findAll({
+        where: whereClause,
+        order: order
+      });
+
+      // Then, get remaining tasks
+      const remainingTasks = await this.model.findAll({
+        where: {
+          [Op.not]: whereClause
+        }
+      });
+
+      // Combine and send the results
+      const allTasks = [...matchingTasks, ...remainingTasks];
+      res.json(allTasks);
+    } catch (error) {
+      console.error('Error fetching tasks:', error);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  };
 
   static async proxyRequest(req, res, targetUrl) {
     try {
