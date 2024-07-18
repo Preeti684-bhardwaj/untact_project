@@ -883,68 +883,57 @@ class OrganizationController extends BaseController {
     try {
       const id = req.params.id;
       const { name, contact_person_name } = req.body;
-
-      // Check if only name is provided
-      if (
-        !req.body.hasOwnProperty("name") ||
-        !req.body.hasOwnProperty("contact_person_name")
-      ) {
+  
+      // Check if at least one of name or contact_person_name is provided
+      if (!name && !contact_person_name) {
         return res.status(400).json({
           success: false,
-          error: "Only name or contact person name field can be updated",
+          error: "Either name or contact person name must be provided for update",
         });
       }
-      // mandatory field check
-      if (!name) {
-        return res
-          .status(400)
-          .send({ success: false, message: "Name is required" });
-      }
-      if (!contact_person_name) {
-        return res
-          .status(400)
-          .send({ success: false, message: "Contact Person Name is required" });
-      }
-      // Validate input fields
-      if ([name, contact_person_name].some((field) => field?.trim() === "")) {
-        return res.status(400).send({
-          success: false,
-          message: "Please provide all necessary fields",
-        });
-      }
-      // Validate name
-      const nameError = isValidLength(name);
-      if (nameError) {
-        return res.status(400).send({ success: false, message: nameError });
-      }
-      // validate contact person name
-      const contactPersonNameError = isValidLength(contact_person_name);
-      if (contactPersonNameError) {
-        return res
-          .status(400)
-          .send({ success: false, message: contactPersonNameError });
-      }
-      const [updated] = await models.Organization.update(
-        { name: name.trim(),contact_person_name:contact_person_name.trim() },
-        {
-          where: { id: id },
+  
+      const updateData = {};
+  
+      // Validate and add name if provided
+      if (name !== undefined) {
+        if (typeof name !== 'string' || name.trim() === "") {
+          return res.status(400).send({ success: false, message: "Name must be a non-empty string" });
         }
-      );
-
+        const nameError = isValidLength(name);
+        if (nameError) {
+          return res.status(400).send({ success: false, message: nameError });
+        }
+        updateData.name = name.trim();
+      }
+  
+      // Validate and add contact_person_name if provided
+      if (contact_person_name !== undefined) {
+        if (typeof contact_person_name !== 'string' || contact_person_name.trim() === "") {
+          return res.status(400).send({ success: false, message: "Contact Person Name must be a non-empty string" });
+        }
+        const contactPersonNameError = isValidLength(contact_person_name);
+        if (contactPersonNameError) {
+          return res.status(400).send({ success: false, message: contactPersonNameError });
+        }
+        updateData.contact_person_name = contact_person_name.trim();
+      }
+  
+      const [updated] = await models.Organization.update(updateData, {
+        where: { id: id },
+      });
+  
       if (updated) {
         const updatedItem = await models.Organization.findByPk(id, {
           attributes: { exclude: ["password"] },
         });
-
+  
         if (!updatedItem) {
-          return res
-            .status(404)
-            .json({ success: false, error: "Item not found after update" });
+          return res.status(404).json({ success: false, error: "Item not found after update" });
         }
-
+  
         res.json({
           success: true,
-          message: "updated successfully by agent",
+          message: "Updated successfully by agent",
           data: updatedItem,
         });
       } else {
