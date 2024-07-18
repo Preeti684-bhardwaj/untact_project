@@ -1,7 +1,7 @@
 const env = {
   database: 'untactserver',
-  username: 'postgres',
-  password: '987654',
+  username: 'untactuser',
+  password: 'untactuser123',
   host: 'localhost',
   dialect: 'postgres',
   pool: {
