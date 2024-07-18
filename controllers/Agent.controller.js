@@ -102,12 +102,12 @@ class AgentController extends BaseController {
           .status(400)
           .send({ success: false, message: "Email is required" });
       }
-      if (phone) {
+      if (!phone) {
         return res
           .status(400)
           .send({ success: false, message: "Phone is required" });
       }
-      if (password) {
+      if (!password) {
         return res
           .status(400)
           .send({ success: false, message: "Password is required" });
@@ -229,12 +229,12 @@ class AgentController extends BaseController {
           .status(400)
           .send({ success: false, message: "Email is required" });
       }
-      if (phone) {
+      if (!phone) {
         return res
           .status(400)
           .send({ success: false, message: "Phone is required" });
       }
-      if (password) {
+      if (!password) {
         return res
           .status(400)
           .send({ success: false, message: "Password is required" });
