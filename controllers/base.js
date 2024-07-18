@@ -32,7 +32,8 @@ class BaseController {
 
   async listWithReferences(req, res) {
     try {
-      const { user, page = 1, limit = 10, attributes, include, where } = req.body;
+      const{page=1 ,limit}=req.query;
+      const { user, attributes, include, where } = req.body;
 
       const offset = (page - 1) * limit;
 
