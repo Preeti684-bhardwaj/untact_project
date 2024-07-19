@@ -15,6 +15,7 @@ class BaseController {
   initializeRoutes() {
     this.router.get('/list', this.listWithReferences.bind(this));
     this.router.get('/:id', this.read.bind(this));
+    this.router.get('/filter/Item',this.filter.bind(this));
     this.router.post('/', this.create.bind(this));
     this.router.put('/:id', this.update.bind(this));
     this.router.put('/update/:id',authenticate ,authorizeAdminOrOrganization,this.updateJobPost.bind(this))
