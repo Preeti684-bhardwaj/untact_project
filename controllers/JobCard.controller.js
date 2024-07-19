@@ -57,6 +57,9 @@ class JobCardController extends BaseController {
       res.status(500).json({ success:false,error: error.message });
     }
   };
+  async updateJobCardStatus (req,res){
+    
+  }
 }
 
 module.exports = new JobCardController();

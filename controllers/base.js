@@ -16,7 +16,7 @@ class BaseController {
   initializeRoutes() {
     this.router.get('/list', this.listWithReferences.bind(this));
     this.router.get('/:id', this.read.bind(this));
-    this.router.get('/filter/Item',this.filter.bind(this));
+    this.router.get('/filter/Item/:id',this.filter.bind(this));
     this.router.post('/', this.create.bind(this));
     this.router.put('/:id', this.update.bind(this));
     this.router.put('/update/:id',authenticate ,authorizeAdminOrOrganization,this.updateJobPost.bind(this))
@@ -335,49 +335,50 @@ const limitValue=parseInt(limit,10)
     }
   }
   async filter(req, res) {
-    // const { id } = req.params;
-
-    const { due_date, status, priority } = req.query;
-    console.log(req.query);
-    let whereClause = {};
-    let order = [];
-
-    // Build dynamic where clause and order
-    if (due_date) {
-      whereClause.due_date = due_date;
-      order.push(['due_date', 'DESC']);
-    }
-    if (status) {
-      whereClause.status = status;
-      order.push(['status', 'DESC']);
-    }
-    if (priority) {
-      whereClause.priority = priority;
-      order.push(['priority', 'DESC']);
-    }
-
     try {
-      // First, get tasks that match the query
-      const matchingTasks = await this.model.findAll({
-        where: whereClause,
-        order: order
-      });
-
-      // Then, get remaining tasks
-      const remainingTasks = await this.model.findAll({
-        where: {
-          [Op.not]: whereClause
-        }
-      });
-
-      // Combine and send the results
-      const allTasks = [...matchingTasks, ...remainingTasks];
-      res.json(allTasks);
+      const { id } = req.params;
+      const { due_date, status, priority } = req.query;
+      console.log(req.query);
+      
+      let whereClause = {};
+      let order = [];
+  
+      // Add id to whereClause if provided
+      if (id) {
+        whereClause.id = id;
+      }
+  
+      // Build dynamic where clause and order
+      if (due_date) {
+        whereClause.due_date = due_date;
+        order.push(['due_date', 'DESC']);
+      }
+      if (status) {
+        whereClause.status = status;
+        order.push(['status', 'DESC']);
+      }
+      if (priority) {
+        whereClause.priority = priority;
+        order.push(['priority', 'DESC']);
+      }
+  
+      try {
+        // Fetch tasks based on the whereClause and order
+        const tasks = await this.model.findAll({
+          where: whereClause,
+          order: order
+        });
+  
+        res.json(tasks);
+      } catch (error) {
+        console.error('Error fetching tasks:', error);
+        res.status(400).json({ error: 'Something went wrong while fetching the data' });
+      }
     } catch (error) {
-      console.error('Error fetching tasks:', error);
+      console.error('Error in filter function:', error);
       res.status(500).json({ error: 'Internal server error' });
     }
-  };
+  }
 
   static async proxyRequest(req, res, targetUrl) {
     try {
