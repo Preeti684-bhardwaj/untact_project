@@ -188,15 +188,6 @@ class OrganizationController extends BaseController {
           .send({ success: false, message: "Invalid email" });
       }
 
-      if (!isValidPassword(password)) {
-        return res.status(400).send({
-          success: false,
-          message:
-            "Password must contain at least 8 characters, including uppercase, lowercase, number and special character",
-        });
-      }
-      const hashedPassword = await bcrypt.hash(password, 10);
-
       // Check for existing organization by email or phone
       //   const existingOrganizationByEmail = await models.Organization.findOne({
       //     where: { email },
@@ -293,7 +284,14 @@ class OrganizationController extends BaseController {
             .send({ success: false, message: "Phone number already in use" });
         }
       }
-
+      const passwordValidationResult = isValidPassword(password);
+      if (passwordValidationResult) {
+        return res.status(400).send({
+          success: false,
+          message: passwordValidationResult
+        });
+      }
+      const hashedPassword = await bcrypt.hash(password, 10);
       // If no existing admin, create a new one
       const emailToken = generateToken({ email: email.toLowerCase() });
 
@@ -429,16 +427,6 @@ class OrganizationController extends BaseController {
           .status(400)
           .send({ success: false, message: "Invalid email" });
       }
-      // validate password
-      if (!isValidPassword(password)) {
-        return res.status(400).send({
-          success: false,
-          message:
-            "Password must contain at least 8 characters, including uppercase, lowercase, number and special character",
-        });
-      }
-      // hash password
-      const hashedPassword = await bcrypt.hash(password, 10);
       // DB call
       const existingOrganization = await models.Organization.findOne(
         {
@@ -472,7 +460,14 @@ class OrganizationController extends BaseController {
             .send({ success: false, message: "Phone number already in use" });
         }
       }
-
+      const passwordValidationResult = isValidPassword(password);
+      if (passwordValidationResult) {
+        return res.status(400).send({
+          success: false,
+          message: passwordValidationResult
+        });
+      }
+      const hashedPassword = await bcrypt.hash(password, 10);
       // If no existing admin, create a new one
       const emailToken = generateToken({ email: email.toLowerCase() });
 
@@ -529,8 +524,10 @@ class OrganizationController extends BaseController {
     }
 
     try {
+            // Convert email to lowercase before querying
+    const lowercaseEmail = email.toLowerCase().trim();
       const organization = await models.Organization.findOne({
-        where: { email: email.trim() },
+        where: { email: lowercaseEmail },
       });
       console.log(organization);
       if (!organization) {
@@ -802,9 +799,11 @@ class OrganizationController extends BaseController {
     }
 
     try {
+       // Convert email to lowercase before querying
+    const lowercaseEmail = email.toLowerCase().trim();
       const organization = await models.Organization.findOne({
         where: {
-          email: email.trim(),
+          email: lowercaseEmail,
         },
       });
 

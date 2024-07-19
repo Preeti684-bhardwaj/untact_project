@@ -128,15 +128,6 @@ class AdminController extends BaseController {
           .status(400)
           .send({ success: false, message: "Invalid Phone Number" });
       }
-
-      if (!isValidPassword(password)) {
-        return res.status(400).send({
-          success: false,
-          message:
-            "Password must contain at least 8 characters, including uppercase, lowercase, number and special character",
-        });
-      }
-      const hashedPassword = await bcrypt.hash(password, 10);
       const existingAdmin = await models.Admin.findOne(
         {
           where: {
@@ -167,6 +158,14 @@ class AdminController extends BaseController {
         }
       }
 
+      const passwordValidationResult = isValidPassword(password);
+      if (passwordValidationResult) {
+        return res.status(400).send({
+          success: false,
+          message: passwordValidationResult
+        });
+      }
+      const hashedPassword = await bcrypt.hash(password, 10);
       // If no existing admin, create a new one
       const emailToken = generateToken({ email: email.toLowerCase() });
 
@@ -218,8 +217,11 @@ class AdminController extends BaseController {
     }
 
     try {
+      // Convert email to lowercase before querying
+      const lowercaseEmail = email.toLowerCase().trim();
+
       const admin = await models.Admin.findOne({
-        where: { email: email.trim() },
+        where: { email: lowercaseEmail },
       });
       console.log(admin);
       if (!admin) {
@@ -489,10 +491,11 @@ class AdminController extends BaseController {
     }
 
     try {
+      // Convert email to lowercase before querying
+      const lowercaseEmail = email.toLowerCase().trim();
+
       const admin = await models.Admin.findOne({
-        where: {
-          email: email.trim(),
-        },
+        where: { email: lowercaseEmail },
       });
 
       if (!admin) {
@@ -539,45 +542,67 @@ class AdminController extends BaseController {
   async updateAdmin(req, res) {
     try {
       const id = req.params.id;
-      const updateData = req.body;
-  
-      // Check if any field is empty before updating
-      if (Object.values(updateData).some(field => field?.trim() === "")) {
+      const { name, email, phone } = req.body;
+      // Validate name
+      if (name) {
+        const nameError = isValidLength(name);
+        if (nameError) {
+          return res.status(400).send({ success: false, message: nameError });
+        }
+      }
+      if (email) {
+        if (!isValidEmail(email)) {
+          return res
+            .status(400)
+            .send({ success: false, message: "Invalid email" });
+        }
+      }
+      if (phone) {
+        if (!isValidPhone(phone)) {
+          return res
+            .status(400)
+            .send({ success: false, message: "Invalid Phone Number" });
+        }
+      }
+      // Prepare the update object
+      const updateData = {};
+      if (name && name.trim() !== "") updateData.name = name.trim();
+      if (email && email.trim() !== "") updateData.email = email.toLowerCase().trim();
+      if (phone && phone.trim() !== "") updateData.phone = phone.trim();
+
+      // Check if any valid field is provided
+      if (Object.keys(updateData).length === 0) {
         return res.status(400).send({
           success: false,
-          message: "Please provide all necessary fields",
+          message: "Please provide at least one valid field to update (name, email, or phone)",
         });
       }
-  
-      // Remove password from updateData if it exists
-      if ('password' in updateData) {
-        delete updateData.password;
-      }
-  
-      const [updatedRowsCount] = await this.model.update(updateData, {
-        where: { id: id },
+
+      // Update the admin
+      const [updatedRowsCount] = await models.Admin.update(updateData, {
+        where: { id: id }
       });
-  
+
       if (updatedRowsCount > 0) {
         const updatedItem = await this.model.findByPk(id, {
           attributes: { exclude: ["password"] },
         });
-  
+
         if (updatedItem) {
           res.json({
             success: true,
-            message: "Updated successfully",
+            message: "Admin updated successfully",
             data: updatedItem,
           });
         } else {
-          res.status(404).json({ success: false, error: "Item not found after update" });
+          res.status(404).json({ success: false, error: "Admin not found after update" });
         }
       } else {
-        res.status(404).json({ success: false, error: "field not found or cannot be updated" });
+        res.status(404).json({ success: false, error: "Admin not found or couldn't be updated" });
       }
     } catch (error) {
       console.error('Update error:', error);
-      res.status(500).json({ success: false, error: "An error occurred while updating the item" });
+      res.status(500).json({ success: false, error: "An error occurred while updating the admin" });
     }
   }
 }
