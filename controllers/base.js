@@ -450,7 +450,7 @@ class BaseController {
         if (isNaN(Date.parse(due_date))) {
           return res.status(400).json({ success: false, error: "Invalid due date format" });
         }
-        whereClause.due_date = due_date;
+        order.push(['due_date', 'DESC']);
       }
   
       // Validate name
@@ -458,7 +458,7 @@ class BaseController {
         if (typeof name !== 'string' || name.trim() === '') {
           return res.status(400).json({ success: false, error: "Invalid name format" });
         }
-        whereClause.name = name;
+        order.push(['name', 'DESC']);
       }
   
       // Add default ordering
@@ -466,7 +466,7 @@ class BaseController {
   
       // Define query options
       const queryOptions = {
-        where: whereClause,
+        // where: whereClause,
         order: order,
         attributes: { exclude: ["password"] },
         limit: limitValue,
