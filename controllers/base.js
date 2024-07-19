@@ -1,9 +1,13 @@
-const db = require('../config/db.config.js');
-const axios = require('axios');
+const db = require("../config/db.config.js");
+const axios = require("axios");
 const sequelize = db.sequelize;
-const express = require('express');
-const models = require('../models');
-const { authenticate, authorizeAdmin ,authorizeAdminOrOrganization} = require("../controllers/auth");
+const express = require("express");
+const models = require("../models");
+const {
+  authenticate,
+  authorizeAdmin,
+  authorizeAdminOrOrganization,
+} = require("../controllers/auth");
 class BaseController {
   constructor(model) {
     this.model = model;
@@ -13,13 +17,23 @@ class BaseController {
   }
 
   initializeRoutes() {
-    this.router.get('/list', this.listWithReferences.bind(this));
-    this.router.get('/:id', this.read.bind(this));
-    this.router.post('/', this.create.bind(this));
-    this.router.put('/:id', this.update.bind(this));
-    this.router.put('/update/:id',authenticate ,authorizeAdminOrOrganization,this.updateJobPost.bind(this))
-    this.router.delete('/:id', this.delete.bind(this));
-    this.router.delete('/deletedByAdmin/:id',authenticate, authorizeAdmin, this.delete.bind(this));
+    this.router.get("/list", this.listWithReferences.bind(this));
+    this.router.get("/:id", this.read.bind(this));
+    this.router.post("/", this.create.bind(this));
+    this.router.put("/:id", this.update.bind(this));
+    this.router.put(
+      "/update/:id",
+      authenticate,
+      authorizeAdminOrOrganization,
+      this.updateJobPost.bind(this)
+    );
+    this.router.delete("/:id", this.delete.bind(this));
+    this.router.delete(
+      "/deletedByAdmin/:id",
+      authenticate,
+      authorizeAdmin,
+      this.delete.bind(this)
+    );
   }
 
   listArgVerify(req, res, queryOptions) {
@@ -32,22 +46,29 @@ class BaseController {
 
   async listWithReferences(req, res) {
     try {
-      const{page=1 ,limit}=req.query;
+      const { page = 1, limit } = req.query;
       const { user, attributes, include, where } = req.body;
-const pageValue=parseInt(page,10)
-const limitValue=parseInt(limit,10)
+      const pageValue = parseInt(page, 10);
+      const limitValue = parseInt(limit, 10);
       const offset = (pageValue - 1) * limitValue;
 
-      let validAttributes = attributes ? attributes.filter(attr => this.validAttributesCache.has(attr)) : null;
+      let validAttributes = attributes
+        ? attributes.filter((attr) => this.validAttributesCache.has(attr))
+        : null;
       if (validAttributes && validAttributes.length === 0) {
-        return res.status(400).json({ error: 'No valid attributes provided' });
+        return res.status(400).json({success:false, error: "No valid attributes provided" });
       }
 
       let queryWhere = {};
       if (where) {
         for (let key in where) {
           if (!this.validAttributesCache.has(key)) {
-            return res.status(400).json({ error: `Invalid attribute for filtering: ${key}` });
+            return res
+              .status(400)
+              .json({
+                success: false,
+                error: `Invalid attribute for filtering: ${key}`,
+              });
           }
           queryWhere[key] = where[key];
         }
@@ -61,11 +82,22 @@ const limitValue=parseInt(limit,10)
 
       let queryInclude = [];
       if (include) {
-        include.forEach(inc => {
-          if (this.model.associations[inc] && this.model.associations[inc].target) {
-            queryInclude.push({ model: this.model.associations[inc].target, as: inc });
+        include.forEach((inc) => {
+          if (
+            this.model.associations[inc] &&
+            this.model.associations[inc].target
+          ) {
+            queryInclude.push({
+              model: this.model.associations[inc].target,
+              as: inc,
+            });
           } else {
-            return res.status(400).json({ error: `Invalid include parameter: ${inc}` });
+            return res
+              .status(400)
+              .json({
+                success: false,
+                error: `Invalid include parameter: ${inc}`,
+              });
           }
         });
       }
@@ -76,7 +108,7 @@ const limitValue=parseInt(limit,10)
         include: queryInclude,
         limit: limitValue,
         offset: offset,
-        order: [['id', 'ASC']]
+        order: [["id", "ASC"]],
       };
       this.listArgVerify(req, res, queryOptions);
 
@@ -84,14 +116,14 @@ const limitValue=parseInt(limit,10)
       const results = await this.model.findAndCountAll(queryOptions);
 
       res.json({
-        success:true,
+        success: true,
         data: results.rows,
         total: results.count,
         totalPages: Math.ceil(results.count / limitValue),
-        currentPage: pageValue
+        currentPage: pageValue,
       });
     } catch (error) {
-      res.status(500).json({ error: error.message });
+      res.status(500).json({success:false, error: error.message });
     }
   }
 
@@ -104,19 +136,19 @@ const limitValue=parseInt(limit,10)
       const results = await this.model.findAndCountAll({
         limit: limit,
         offset: offset,
-        attributes: { exclude: ['password'] },
-        order: [['id', 'ASC']],
+        attributes: { exclude: ["password"] },
+        order: [["id", "ASC"]],
       });
 
       res.json({
-        success:true,
+        success: true,
         data: results.rows,
         total: results.count,
         totalPages: Math.ceil(results.count / limit),
-        currentPage: page
+        currentPage: page,
       });
     } catch (error) {
-      res.status(500).json({ error: error.message });
+      res.status(500).json({success:false, error: error.message });
     }
   }
 
@@ -124,15 +156,15 @@ const limitValue=parseInt(limit,10)
     try {
       const id = req.params.id;
       const item = await this.model.findByPk(id, {
-        attributes: { exclude: ['password'] }
+        attributes: { exclude: ["password"] },
       });
       if (!item) {
-        res.status(404).json({ error: 'Item not found' });
+        res.status(404).json({success:false, error: "Item not found" });
       } else {
-        res.json(item);
+        res.json({success:true,data:item});
       }
     } catch (error) {
-      res.status(500).json({ error: error.message });
+      res.status(500).json({success:false, error: error.message });
     }
   }
 
@@ -144,14 +176,19 @@ const limitValue=parseInt(limit,10)
       const modelAssociations = this.model.associations;
       for (const key in modelAssociations) {
         const association = modelAssociations[key];
-        if (association.associationType === 'BelongsToMany') {
+        if (association.associationType === "BelongsToMany") {
           const foreignKey = association.foreignKey;
           const associatedModel = association.target;
           const foreignKeyId = newData[foreignKey];
           if (foreignKeyId) {
-            const associatedInstance = await associatedModel.findByPk(foreignKeyId, { transaction });
+            const associatedInstance = await associatedModel.findByPk(
+              foreignKeyId,
+              { transaction }
+            );
             if (!associatedInstance) {
-              throw new Error(`${associatedModel.name} with ID ${foreignKeyId} not found`);
+              throw new Error(
+                `${associatedModel.name} with ID ${foreignKeyId} not found`
+              );
             }
           }
         }
@@ -159,18 +196,25 @@ const limitValue=parseInt(limit,10)
 
       for (const key in modelAssociations) {
         const association = modelAssociations[key];
-        if (association.associationType === 'BelongsTo') {
+        if (association.associationType === "BelongsTo") {
           const foreignKey = association.foreignKey;
           const associatedModel = association.target;
           const foreignKeyId = newData[foreignKey];
           if (foreignKeyId) {
-            const associatedInstance = await associatedModel.findByPk(foreignKeyId, { transaction });
+            const associatedInstance = await associatedModel.findByPk(
+              foreignKeyId,
+              { transaction }
+            );
             if (!associatedInstance) {
-              throw new Error(`${associatedModel.name} with ID ${foreignKeyId} not found`);
+              throw new Error(
+                `${associatedModel.name} with ID ${foreignKeyId} not found`
+              );
             }
             newData[foreignKey] = foreignKeyId;
           } else {
-            throw new Error(`${associatedModel.name} with ID ${foreignKeyId} not found`);
+            throw new Error(
+              `${associatedModel.name} with ID ${foreignKeyId} not found`
+            );
           }
         }
       }
@@ -190,67 +234,68 @@ const limitValue=parseInt(limit,10)
     try {
       const id = req.params.id;
       const [updated] = await this.model.update(req.body, {
-        where: { id: id }
+        where: { id: id },
       });
 
       if (updated) {
         const updatedItem = await this.model.findByPk(id, {
-          attributes: { exclude: ['password'] }
+          attributes: { exclude: ["password"] },
         });
         res.json(updatedItem);
       } else {
-        res.status(404).json({success:false, error: 'Item not found' });
+        res.status(404).json({ success: false, error: "Item not found" });
       }
     } catch (error) {
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ success:false,error: error.message });
     }
   }
-   async updateJobPost(req, res) {
+  async updateJobPost(req, res) {
     let transaction;
     try {
       transaction = await sequelize.transaction();
-  
+
       const { id } = req.params;
       const { jobCards, ...updatedJobPostData } = req.body;
-  
+
       const jobPost = await this.model.findByPk(id, {
-        include: [{ model: models.JobCard, as: 'cards' }],
+        include: [{ model: models.JobCard, as: "cards" }],
         transaction,
       });
-  
+
       if (!jobPost) {
         await transaction.rollback();
-        return res.status(404).json({ error: 'JobPost not found' });
+        return res.status(404).json({success:false, error: "JobPost not found" });
       }
-  
+
       // Update the JobPost fields
       await jobPost.update(updatedJobPostData, { transaction });
-  
+
       // Update existing JobCards with common fields
       await Promise.all(
         jobPost.cards.map(async (jobCard) => {
           await jobCard.update(
             {
               job_title: updatedJobPostData.job_title || jobCard.job_title,
-              job_description: updatedJobPostData.job_description || jobCard.job_description,
+              job_description:
+                updatedJobPostData.job_description || jobCard.job_description,
               priority: updatedJobPostData.priority || jobCard.priority,
               due_date: updatedJobPostData.due_date || jobCard.due_date,
-              status: updatedJobPostData.status || jobCard.status || 'Open',
+              status: updatedJobPostData.status || jobCard.status || "Open",
             },
             { transaction }
           );
         })
       );
-  
+
       // If new jobCards are provided, append them to the existing jobCards
       if (jobCards && jobCards.length > 0) {
         const currentJobCards = jobPost.jobCards || [];
         const updatedJobCards = [...currentJobCards, ...jobCards];
-  
+
         await jobPost.update({ jobCards: updatedJobCards }, { transaction });
-  
+
         // Create new JobCard entries
-        const newJobCardEntries = jobCards.map(jobCardData => ({
+        const newJobCardEntries = jobCards.map((jobCardData) => ({
           job_title: jobPost.job_title,
           job_description: jobPost.job_description,
           customerDetail: jobCardData,
@@ -261,23 +306,25 @@ const limitValue=parseInt(limit,10)
           OrganizationId: jobPost.OrganizationId,
           AdminId: jobPost.AdminId,
         }));
-  
+
         await models.JobCard.bulkCreate(newJobCardEntries, { transaction });
       }
-  
+
       await transaction.commit();
-      
+
       // Fetch the updated JobPost with associated JobCards
       const finalUpdatedJobPost = await this.model.findByPk(id, {
-        include: [{ 
-          model: models.JobCard,
-          as: 'cards'  // Make sure this alias matches your association
-        }],
+        include: [
+          {
+            model: models.JobCard,
+            as: "cards", // Make sure this alias matches your association
+          },
+        ],
       });
-  
+
       res.status(200).json(finalUpdatedJobPost);
     } catch (error) {
-      console.error('Error in updateJobPost:', error);
+      console.error("Error in updateJobPost:", error);
       if (transaction && !transaction.finished) {
         await transaction.rollback();
       }
@@ -289,16 +336,16 @@ const limitValue=parseInt(limit,10)
     try {
       const id = req.params.id;
       const deleted = await this.model.destroy({
-        where: { id: id }
+        where: { id: id },
       });
 
       if (deleted) {
-       return res.status(200).json({message:"item deleted"});
+        return res.status(200).json({success:true, message: "item deleted" });
       } else {
-        res.status(404).json({ error: 'Item not found' });
+        res.status(404).json({success:false, error: "Item not found" });
       }
     } catch (error) {
-      res.status(500).json({ error: error.message });
+      res.status(500).json({success:true, error: error.message });
     }
   }
 
@@ -310,14 +357,16 @@ const limitValue=parseInt(limit,10)
         params: req.query,
         data: req.body,
         headers: {
-          'Content-Type': 'application/json'
-        }
+          "Content-Type": "application/json",
+        },
       });
 
       res.status(response.status).send(response.data);
     } catch (error) {
-      console.error('Error proxying request:', error.message);
-      res.status(error.response ? error.response.status : 500).send(error.message);
+      console.error("Error proxying request:", error.message);
+      res
+        .status(error.response ? error.response.status : 500)
+        .send(error.message);
     }
   }
 }
