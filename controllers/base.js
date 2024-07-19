@@ -451,16 +451,14 @@ class BaseController {
           return res.status(400).json({ success: false, error: "Invalid due date format" });
         }
         whereClause.due_date = due_date;
-        order.push(["due_date", "DESC"]);
       }
   
-      // Validate name (if any specific validation is needed, like length or format)
+      // Validate name
       if (name) {
         if (typeof name !== 'string' || name.trim() === '') {
           return res.status(400).json({ success: false, error: "Invalid name format" });
         }
         whereClause.name = name;
-        order.push(["name", "DESC"]);
       }
   
       // Add default ordering
@@ -475,7 +473,7 @@ class BaseController {
         offset: offset,
       };
   
-      // Fetch the filtered and paginated results
+      // Fetch the filtered results
       const results = await models.Organization.findAndCountAll(queryOptions);
   
       // Check if results are empty
@@ -497,7 +495,7 @@ class BaseController {
       });
   
       // Apply pagination to the sorted results
-      const paginatedResults = filteredAndSortedResults.slice(0, limitValue);
+      const paginatedResults = filteredAndSortedResults.slice(offset, offset + limitValue);
   
       res.status(200).json({
         success: true,
@@ -510,7 +508,7 @@ class BaseController {
       console.error("Error in filterOrganization:", error);
       res.status(500).json({ success: false, error: `Internal server error: ${error.message}` });
     }
-  }
+  }  
   
   async delete(req, res) {
     try {
