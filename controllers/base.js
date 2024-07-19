@@ -1,10 +1,15 @@
 const db = require("../config/db.config.js");
 const axios = require("axios");
 const sequelize = db.sequelize;
-const { Op } = require("sequelize");
-const express = require('express');
-const models = require('../models');
-const { authenticate, authorizeAdmin ,authorizeAdminOrOrganization} = require("../controllers/auth");
+// const { Op } = require("sequelize");
+const express = require("express");
+const models = require("../models");
+const {
+  authenticate,
+  authorizeAdmin,
+  authorizeAdminOrAgent,
+  authorizeAdminOrOrganization,
+} = require("../controllers/auth");
 class BaseController {
   constructor(model) {
     this.model = model;
@@ -14,14 +19,30 @@ class BaseController {
   }
 
   initializeRoutes() {
-    this.router.get('/list', this.listWithReferences.bind(this));
-    this.router.get('/:id', this.read.bind(this));
-    this.router.get('/filter/Item/:id',this.filter.bind(this));
-    this.router.post('/', this.create.bind(this));
-    this.router.put('/:id', this.update.bind(this));
-    this.router.put('/update/:id',authenticate ,authorizeAdminOrOrganization,this.updateJobPost.bind(this))
-    this.router.delete('/:id', this.delete.bind(this));
-    this.router.delete('/deletedByAdmin/:id',authenticate, authorizeAdmin, this.delete.bind(this));
+    this.router.get("/list", this.listWithReferences.bind(this));
+    this.router.get("/filterOrganization", this.filterOrganization.bind(this));
+    // this.router.get("/:id", this.read.bind(this));
+    // this.router.post("/", this.create.bind(this));
+    this.router.put("/:id", this.update.bind(this));
+    this.router.put(
+      "/jobCardStatus/:id",
+      authenticate,
+      authorizeAdminOrAgent,
+      this.updateJobCardStatus.bind(this)
+    );
+    this.router.put(
+      "/update/:id",
+      authenticate,
+      authorizeAdminOrOrganization,
+      this.updateJobPost.bind(this)
+    );
+    this.router.delete("/:id", this.delete.bind(this));
+    this.router.delete(
+      "/deletedByAdmin/:id",
+      authenticate,
+      authorizeAdmin,
+      this.delete.bind(this)
+    );
   }
 
   listArgVerify(req, res, queryOptions) {
@@ -36,27 +57,27 @@ class BaseController {
     try {
       const { page = 1, limit } = req.query;
       const { user, attributes, include, where } = req.body;
-const pageValue=parseInt(page,10)
-const limitValue=parseInt(limit,10)
+      const pageValue = parseInt(page, 10);
+      const limitValue = parseInt(limit, 10);
       const offset = (pageValue - 1) * limitValue;
 
       let validAttributes = attributes
         ? attributes.filter((attr) => this.validAttributesCache.has(attr))
         : null;
       if (validAttributes && validAttributes.length === 0) {
-        return res.status(400).json({success:false, error: "No valid attributes provided" });
+        return res
+          .status(400)
+          .json({ success: false, error: "No valid attributes provided" });
       }
 
       let queryWhere = {};
       if (where) {
         for (let key in where) {
           if (!this.validAttributesCache.has(key)) {
-            return res
-              .status(400)
-              .json({
-                success: false,
-                error: `Invalid attribute for filtering: ${key}`,
-              });
+            return res.status(400).json({
+              success: false,
+              error: `Invalid attribute for filtering: ${key}`,
+            });
           }
           queryWhere[key] = where[key];
         }
@@ -80,12 +101,10 @@ const limitValue=parseInt(limit,10)
               as: inc,
             });
           } else {
-            return res
-              .status(400)
-              .json({
-                success: false,
-                error: `Invalid include parameter: ${inc}`,
-              });
+            return res.status(400).json({
+              success: false,
+              error: `Invalid include parameter: ${inc}`,
+            });
           }
         });
       }
@@ -111,7 +130,7 @@ const limitValue=parseInt(limit,10)
         currentPage: pageValue,
       });
     } catch (error) {
-      res.status(500).json({success:false, error: error.message });
+      res.status(500).json({ success: false, error: error.message });
     }
   }
 
@@ -136,7 +155,7 @@ const limitValue=parseInt(limit,10)
         currentPage: page,
       });
     } catch (error) {
-      res.status(500).json({success:false, error: error.message });
+      res.status(500).json({ success: false, error: error.message });
     }
   }
 
@@ -147,12 +166,12 @@ const limitValue=parseInt(limit,10)
         attributes: { exclude: ["password"] },
       });
       if (!item) {
-        res.status(404).json({success:false, error: "Item not found" });
+        res.status(404).json({ success: false, error: "Item not found" });
       } else {
-        res.json({success:true,data:item});
+        res.json({ success: true, data: item });
       }
     } catch (error) {
-      res.status(500).json({success:false, error: error.message });
+      res.status(500).json({ success: false, error: error.message });
     }
   }
 
@@ -231,10 +250,10 @@ const limitValue=parseInt(limit,10)
         });
         res.json(updatedItem);
       } else {
-        res.status(404).json({success:false, error: 'Item not found' });
+        res.status(404).json({ success: false, error: "Item not found" });
       }
     } catch (error) {
-      res.status(500).json({ success:false,error: error.message });
+      res.status(500).json({ success: false, error: error.message });
     }
   }
   async updateJobPost(req, res) {
@@ -252,7 +271,9 @@ const limitValue=parseInt(limit,10)
 
       if (!jobPost) {
         await transaction.rollback();
-        return res.status(404).json({success:false, error: "JobPost not found" });
+        return res
+          .status(404)
+          .json({ success: false, error: "JobPost not found" });
       }
 
       // Update the JobPost fields
@@ -302,10 +323,12 @@ const limitValue=parseInt(limit,10)
 
       // Fetch the updated JobPost with associated JobCards
       const finalUpdatedJobPost = await this.model.findByPk(id, {
-        include: [{ 
-          model: models.JobCard,
-          as: 'cards'  // Make sure this alias matches your association
-        }],
+        include: [
+          {
+            model: models.JobCard,
+            as: "cards", // Make sure this alias matches your association
+          },
+        ],
       });
 
       res.status(200).json(finalUpdatedJobPost);
@@ -317,7 +340,178 @@ const limitValue=parseInt(limit,10)
       res.status(400).json({ error: error.message });
     }
   }
+  async updateJobCardStatus(req, res) {
+    try {
+      const id = req.params.id; // JobCard ID
+      const { status } = req.body;
+      const userId = req.userId;
+      const userType = req.userType;
+      console.log(userId);
+      console.log(userType);
 
+      // Validate JobCard ID
+      if (!id) {
+        return res
+          .status(400)
+          .json({ success: false, error: "JobCard ID is required" });
+      }
+
+      // Validate status
+      if (!status || typeof status !== "string") {
+        return res
+          .status(400)
+          .json({ success: false, error: "Valid status is required" });
+      }
+
+      // Fetch the JobCard
+      const jobCard = await models.JobCard.findByPk(id);
+      if (!jobCard) {
+        return res
+          .status(404)
+          .json({ success: false, error: "JobCard not found" });
+      }
+
+      // Define allowed status updates based on user type
+      const allowedStatusUpdates = {
+        ADMIN: ["Open", "Ongoing", "Completed"],
+        AGENT: ["Completed"],
+      };
+
+      // Check if the user is allowed to update to the requested status
+      if (!allowedStatusUpdates[userType]?.includes(status)) {
+        return res.status(403).json({
+          success: false,
+          error: `${userType} is not allowed to update status to ${status}`,
+        });
+      }
+
+      // Validate status transition
+      const validTransitions = {
+        Open: ["Ongoing", "Completed"],
+        Ongoing: ["Completed"],
+        Completed: ["Open"],
+      };
+
+      if (!validTransitions[jobCard.status]?.includes(status)) {
+        return res.status(400).json({
+          success: false,
+          error: `Invalid status transition from ${jobCard.status} to ${status}`,
+        });
+      }
+
+      // Update the JobCard status
+      jobCard.status = status;
+      jobCard.lastUpdatedBy = userId;
+      await jobCard.save();
+
+      // Fetch the updated JobCard (excluding sensitive info)
+      const updatedJobCard = await models.JobCard.findByPk(id, {
+        attributes: { exclude: ["password"] },
+      });
+
+      res.json({
+        success: true,
+        message: "JobCard status updated successfully",
+        data: updatedJobCard,
+      });
+    } catch (error) {
+      console.error("Error updating JobCard status:", error);
+      res
+        .status(500)
+        .json({
+          success: false,
+          error: `Internal server error ${error.message}`,
+        });
+    }
+  }
+  async filterOrganization(req, res) {
+    try {
+      const { page = 1, limit } = req.query;
+      const { due_date, name } = req.query;
+  
+      // Validate page and limit
+      const pageValue = parseInt(page, 10);
+      const limitValue = parseInt(limit, 10);
+  
+      if (isNaN(pageValue) || pageValue <= 0) {
+        return res.status(400).json({ success: false, error: "Invalid page number" });
+      }
+      if (isNaN(limitValue) || limitValue <= 0) {
+        return res.status(400).json({ success: false, error: "Invalid limit number" });
+      }
+  
+      const offset = (pageValue - 1) * limitValue;
+  
+      let order = [];
+      let whereClause = {};
+  
+      // Validate due_date
+      if (due_date) {
+        if (isNaN(Date.parse(due_date))) {
+          return res.status(400).json({ success: false, error: "Invalid due date format" });
+        }
+        whereClause.due_date = due_date;
+        order.push(["due_date", "DESC"]);
+      }
+  
+      // Validate name (if any specific validation is needed, like length or format)
+      if (name) {
+        if (typeof name !== 'string' || name.trim() === '') {
+          return res.status(400).json({ success: false, error: "Invalid name format" });
+        }
+        whereClause.name = name;
+        order.push(["name", "DESC"]);
+      }
+  
+      // Add default ordering
+      order.push(["createdAt", "DESC"]);
+  
+      // Define query options
+      const queryOptions = {
+        where: whereClause,
+        order: order,
+        attributes: { exclude: ["password"] },
+        limit: limitValue,
+        offset: offset,
+      };
+  
+      // Fetch the filtered and paginated results
+      const results = await models.Organization.findAndCountAll(queryOptions);
+  
+      // Check if results are empty
+      if (!results.rows.length) {
+        return res.status(404).json({
+          success: false,
+          message: "No matching organizations found",
+        });
+      }
+  
+      // Filter and sort the results
+      const filteredAndSortedResults = results.rows.sort((a, b) => {
+        const aMatch = (!due_date || a.due_date === due_date) && (!name || a.name === name);
+        const bMatch = (!due_date || b.due_date === due_date) && (!name || b.name === name);
+  
+        if (aMatch && !bMatch) return -1;
+        if (!aMatch && bMatch) return 1;
+        return 0;
+      });
+  
+      // Apply pagination to the sorted results
+      const paginatedResults = filteredAndSortedResults.slice(0, limitValue);
+  
+      res.status(200).json({
+        success: true,
+        data: paginatedResults,
+        total: results.count,
+        totalPages: Math.ceil(results.count / limitValue),
+        currentPage: pageValue,
+      });
+    } catch (error) {
+      console.error("Error in filterOrganization:", error);
+      res.status(500).json({ success: false, error: `Internal server error: ${error.message}` });
+    }
+  }
+  
   async delete(req, res) {
     try {
       const id = req.params.id;
@@ -326,57 +520,12 @@ const limitValue=parseInt(limit,10)
       });
 
       if (deleted) {
-       return res.status(200).json({message:"item deleted"});
+        return res.status(200).json({ message: "item deleted" });
       } else {
-        res.status(404).json({success:false, error: "Item not found" });
+        res.status(404).json({ success: false, error: "Item not found" });
       }
     } catch (error) {
-      res.status(500).json({success:true, error: error.message });
-    }
-  }
-  async filter(req, res) {
-    try {
-      const { id } = req.params;
-      const { due_date, status, priority } = req.query;
-      console.log(req.query);
-      
-      let whereClause = {};
-      let order = [];
-  
-      // Add id to whereClause if provided
-      if (id) {
-        whereClause.id = id;
-      }
-  
-      // Build dynamic where clause and order
-      if (due_date) {
-        whereClause.due_date = due_date;
-        order.push(['due_date', 'DESC']);
-      }
-      if (status) {
-        whereClause.status = status;
-        order.push(['status', 'DESC']);
-      }
-      if (priority) {
-        whereClause.priority = priority;
-        order.push(['priority', 'DESC']);
-      }
-  
-      try {
-        // Fetch tasks based on the whereClause and order
-        const tasks = await this.model.findAll({
-          where: whereClause,
-          order: order
-        });
-  
-        res.json(tasks);
-      } catch (error) {
-        console.error('Error fetching tasks:', error);
-        res.status(400).json({ error: 'Something went wrong while fetching the data' });
-      }
-    } catch (error) {
-      console.error('Error in filter function:', error);
-      res.status(500).json({ error: 'Internal server error' });
+      res.status(500).json({ success: true, error: error.message });
     }
   }
 

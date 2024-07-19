@@ -181,5 +181,29 @@ exports.authorizeAdminOrOrganization = async (req, res, next) => {
 
     return res.status(403).json({ error: 'Not authorized' });
 };
+exports.authorizeAdminOrAgent = async (req, res, next) => {
+    const id = req.userId;
+    const type=req.userType;
+
+    if (type === 'ADMIN') {
+        const admin = await models.Admin.findByPk(req.userId);
+
+        if (!admin) {
+            return res.status(403).send({ message: 'You are not authorized to access this resource.' });
+        }
+        // If user is an admin, proceed
+        return next();
+    }
+
+    if (type === 'AGENT') {
+        // Check if the user is part of the organization
+        const agent = await models.Agent.findByPk(id);
+        if (agent) {
+            return next();
+        }
+    }
+
+    return res.status(403).json({ error: 'Not authorized' });
+};
 
 

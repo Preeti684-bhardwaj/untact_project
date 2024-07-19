@@ -25,5 +25,9 @@ models.JobCard.belongsTo(models.Organization);
 models.Admin.hasMany(models.JobCard, { as: 'cardsByAdmin' });
 models.JobCard.belongsTo(models.Admin);
 
+models.Admin.hasMany(models.JobCard, { as: 'updatedJobCards', foreignKey: 'lastUpdatedBy' });
+models.Agent.hasMany(models.JobCard, { as: 'updatedJobCards', foreignKey: 'lastUpdatedBy' });
+
+
 models.db = db;
 module.exports = models;

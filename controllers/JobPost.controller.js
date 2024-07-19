@@ -25,6 +25,7 @@ class JobPostController extends BaseController {
       authorizeAdminOrOrganization,
       this.deleteJobPost.bind(this)
     );
+    // this.router.get("/filterJobpost/:id", this.filter.bind(this));
   }
 
   listArgVerify(req, res, queryOptions) {
@@ -96,44 +97,69 @@ class JobPostController extends BaseController {
       res.status(400).json({ error: error.message });
     }
   }
-  getAllJobPostByOrganizationId = async (req, res) => {
+  async getAllJobPostByOrganizationId(req, res) {
     try {
       const organizationId = req.params.organizationId;
       if (!organizationId) {
         return res.status(400).json({ message: "Organization ID is required" });
       }
+  
+      const { due_date, status, priority } = req.query;
       const page = parseInt(req.query.page, 10) || 1;
       const limit = parseInt(req.query.limit, 10) || 10;
       const offset = (page - 1) * limit;
-
-      const jobPost = await models.Organization.findAndCountAll({
-        where: {
-          id: organizationId,
-        },
-        include: [
-          {
-            model: models.JobPost,
-            as: "jobPosts", // Use the correct association alias
-          },
-        ],
-        limit: limit,
-        offset: offset,
+  
+      let whereClause = { OrganizationId: organizationId };
+      let order = [];
+  
+      // Build dynamic order based on filter criteria
+      if (due_date) order.push(['due_date', 'DESC']);
+      if (status) order.push(['status', 'DESC']);
+      if (priority) order.push(['priority', 'DESC']);
+  
+      // Add default ordering
+      order.push(["createdAt", "DESC"]);
+  
+      const jobPosts = await models.JobPost.findAndCountAll({
+        where: whereClause,
+        order: order,
         attributes: { exclude: ["password"] },
-        order: [["id", "ASC"]],
       });
-      if (!jobPost) {
-        return res.status(404).json({ message: "Job Post not found" });
+  
+      if (!jobPosts.rows.length) {
+        return res.status(404).json({success: false, message: "No Job Posts found" });
       }
+  
+     // Filter and sort the results
+     const filteredAndSortedPosts = jobCards.rows.sort((a, b) => {
+      const aMatch = (!due_date || a.due_date === due_date) &&
+                     (!status || a.status === status) &&
+                     (!priority || a.priority === priority);
+      const bMatch = (!due_date || b.due_date === due_date) &&
+                     (!status || b.status === status) &&
+                     (!priority || b.priority === priority);
+
+      if (aMatch && !bMatch) return -1;
+      if (!aMatch && bMatch) return 1;
+      return 0;
+    });
+  
+      // Apply pagination to the sorted results
+      const paginatedPosts = filteredAndSortedPosts.slice(offset, offset + limit);
+  
       res.json({
-        data: jobPost.rows,
-        total: jobPost.count,
-        totalPages: Math.ceil(jobPost.count / limit),
+        success:true,
+        data: paginatedPosts,
+        total: jobPosts.count,
+        totalPages: Math.ceil(jobPosts.count / limit),
         currentPage: page,
       });
     } catch (error) {
+      console.error("Error in getAllJobPostByOrganizationId:", error);
       res.status(500).json({ error: error.message });
     }
-  };
+  }
+  
   deleteJobPost = async (req, res) => {
     let transaction;
     try {
