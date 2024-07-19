@@ -1,6 +1,7 @@
 const db = require("../config/db.config.js");
 const axios = require("axios");
 const sequelize = db.sequelize;
+const { Op } = require("sequelize");
 const express = require('express');
 const models = require('../models');
 const { authenticate, authorizeAdmin ,authorizeAdminOrOrganization} = require("../controllers/auth");
