@@ -21,7 +21,7 @@ class BaseController {
   initializeRoutes() {
     this.router.get("/list", this.listWithReferences.bind(this));
     this.router.get("/filterOrganization", this.filterOrganization.bind(this));
-    this.router.get("/:id", this.read.bind(this));
+    this.router.get("/getById/:id", this.read.bind(this));
     // this.router.post("/", this.create.bind(this));
     this.router.put("/:id", this.update.bind(this));
     this.router.put(
