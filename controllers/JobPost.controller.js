@@ -131,7 +131,7 @@ class JobPostController extends BaseController {
       }
   
      // Filter and sort the results
-     const filteredAndSortedPosts = jobCards.rows.sort((a, b) => {
+     const filteredAndSortedPosts = jobPosts.rows.sort((a, b) => {
       const aMatch = (!due_date || a.due_date === due_date) &&
                      (!status || a.status === status) &&
                      (!priority || a.priority === priority);
