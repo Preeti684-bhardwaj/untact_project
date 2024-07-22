@@ -17,7 +17,15 @@ module.exports = (sequelize, DataTypes) => {
             type:DataTypes.ENUM('Open','Ongoing','Completed'),
             defaultValue:'Open'
         },
-        lastUpdatedBy: DataTypes.UUID, 
+        feedBackInfo:DataTypes.STRING,
+        lastUpdatedByAdmin: {
+            type: DataTypes.UUID,
+            allowNull: true,
+          },
+          lastUpdatedByAgent: {
+            type: DataTypes.UUID,
+            allowNull: true,
+          },
         createdAt: DataTypes.DATE,
         updatedAt: DataTypes.DATE
     });

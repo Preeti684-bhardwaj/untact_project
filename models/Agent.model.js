@@ -17,7 +17,7 @@ module.exports = (sequelize, DataTypes) => {
         },
         otp:DataTypes.STRING,
         otpExpire:DataTypes.DATE,
-        IsActivated: {
+        IsActive: {
             type: DataTypes.BOOLEAN,
             defaultValue: false
         },
@@ -30,6 +30,10 @@ module.exports = (sequelize, DataTypes) => {
             defaultValue: false
         },
         emailToken: DataTypes.STRING,
+        startTime:DataTypes.INTEGER,
+        endTime:DataTypes.INTEGER,
+        badgeEarned:DataTypes.INTEGER,
+        jobInHand:DataTypes.INTEGER,
         isJobCompleted:{ //to count the completed job of a agent
             type:DataTypes.BOOLEAN,
             defaultValue:false

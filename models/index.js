@@ -6,6 +6,7 @@ const models = {
     Organization: require('./Organization.model.js')(db.sequelize, db.Sequelize.DataTypes),
     JobPost: require('./JobPost.model.js')(db.sequelize, db.Sequelize.DataTypes),
     JobCard: require('./JobCard.model.js')(db.sequelize, db.Sequelize.DataTypes),
+    Assignment:require('./Assignment.model.js')(db.sequelize, db.Sequelize.DataTypes)
 };
 
 // Define relationships
@@ -25,9 +26,20 @@ models.JobCard.belongsTo(models.Organization);
 models.Admin.hasMany(models.JobCard, { as: 'cardsByAdmin' });
 models.JobCard.belongsTo(models.Admin);
 
-models.Admin.hasMany(models.JobCard, { as: 'updatedJobCards', foreignKey: 'lastUpdatedBy' });
-models.Agent.hasMany(models.JobCard, { as: 'updatedJobCards', foreignKey: 'lastUpdatedBy' });
+models.Admin.hasMany(models.JobCard, { as: 'updatedJobCardsByAdmin', foreignKey: 'lastUpdatedByAdmin' });
+models.JobCard.belongsTo(models.Admin, { foreignKey: 'lastUpdatedByAdmin' });
 
+models.Agent.hasMany(models.JobCard, { as: 'updatedJobCardsByAgent', foreignKey: 'lastUpdatedByAgent' });
+models.JobCard.belongsTo(models.Agent, { foreignKey: 'lastUpdatedByAgent' });
+
+
+
+// Assignment associations
+models.Agent.hasMany(models.Assignment);
+models.Assignment.belongsTo(models.Agent);
+
+models.JobCard.hasMany(models.Assignment);
+models.Assignment.belongsTo(models.JobCard);
 
 models.db = db;
 module.exports = models;

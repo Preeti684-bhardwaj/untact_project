@@ -88,67 +88,6 @@ class JobCardController extends BaseController {
       res.status(500).json({ success: false, error: error.message });
     }
   }
-  // async filter(req, res) {
-  //   try {
-  //     const id = req.params.id;
-  //     const { due_date, status, priority } = req.query;
-  //     console.log(req.query);
-  //     let whereClause = { JobPostId: id }; // Add organization_id to whereClause
-  //     let order = [];
-
-  //     // Build dynamic where clause and order
-  //     if (due_date) {
-  //       whereClause.due_date = due_date;
-  //       order.push(["due_date", "DESC"]);
-  //     }
-  //     if (status) {
-  //       whereClause.status = status;
-  //       order.push(["status", "DESC"]);
-  //     }
-  //     if (priority) {
-  //       whereClause.priority = priority;
-  //       order.push(["priority", "DESC"]);
-  //     }
-
-  //     try {
-  //       // Get all tasks for the organization, ordered by the filter criteria first
-  //       const allTasks = await models.JobCard.findAll({
-  //         where: { JobPostId: id },
-  //         order: [
-  //           ...order,
-  //           ["createdAt", "DESC"], // Default ordering if no filters applied
-  //         ],
-  //       });
-
-  //       // Separate matching and non-matching tasks
-  //       const matchingTasks = allTasks.filter(
-  //         (task) =>
-  //           (due_date ? task.due_date === due_date : true) &&
-  //           (status ? task.status === status : true) &&
-  //           (priority ? task.priority === priority : true)
-  //       );
-
-  //       const remainingTasks = allTasks.filter(
-  //         (task) => !matchingTasks.includes(task)
-  //       );
-
-  //       // Combine and send the results
-  //       const sortedTasks = [...matchingTasks, ...remainingTasks];
-  //       res.json(sortedTasks);
-  //     } catch (error) {
-  //       console.error("Error fetching tasks:", error);
-  //       res
-  //         .status(400)
-  //         .json({
-  //           success: false,
-  //           error: "Something went wrong while fetching the data",
-  //         });
-  //     }
-  //   } catch (error) {
-  //     console.error("Error in filter function:", error);
-  //     res.status(500).json({ success: false, error: "Internal server error" });
-  //   }
-  // }
 }
 
 module.exports = new JobCardController();

@@ -735,7 +735,7 @@ class OrganizationController extends BaseController {
         message: "Missing required fields: password or OTP",
       });
     }
-    if (organizationId) {
+    if (!organizationId) {
       return res.status(400).send({
         success: false,
         message: "Missing organizationId in the params",

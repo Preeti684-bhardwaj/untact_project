@@ -1,3 +1,6 @@
+const { STRING } = require("sequelize");
+const { database } = require("../config/env");
+
 module.exports = (sequelize, DataTypes) => {
     const Jobpost = sequelize.define('JobPost', {
         id: {
@@ -17,6 +20,8 @@ module.exports = (sequelize, DataTypes) => {
             type:DataTypes.ENUM('Open','Ongoing','Completed'),
             defaultValue:'Open'
         },
+        feedBackList:DataTypes.ARRAY(DataTypes.STRING),
+        averageTime:DataTypes.INTEGER,
         createdAt: DataTypes.DATE,
         updatedAt: DataTypes.DATE
     });

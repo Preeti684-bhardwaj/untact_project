@@ -8,6 +8,7 @@ const {
   isValidPassword,
   isValidLength,
 } = require("../utils/validation");
+const moment = require("moment");
 const sendEmail = require("../utils/sendEmail.js");
 const { Op } = require("sequelize");
 const sequelize = require("../config/db.config").sequelize; // Ensure this path is correct
@@ -58,6 +59,13 @@ class AgentController extends BaseController {
       this.updateAgentByAdmin.bind(this)
     );
     this.router.put("/updateByAgent/:id", this.updateByAgent.bind(this));
+    this.router.get("/availability", this.getAgentAvailability.bind(this));
+    this.router.post("/assignJobCard", this.assignJobCardToAgent.bind(this));
+    this.router.post("/removeJobCard", this.removeJobCardFromAgent.bind(this));
+    this.router.get(
+      "/jobCardCounts/:agentId",
+      this.getAgentJobCardCounts.bind(this)
+    );
   }
 
   listArgVerify(req, res, queryOptions) {
@@ -89,7 +97,7 @@ class AgentController extends BaseController {
   signupByAgent = async (req, res) => {
     const transaction = await sequelize.transaction();
     try {
-      const { name, email, phone, password } = req.body;
+      const { name, email, phone, password, startTime, endTime } = req.body;
 
       // mandatory field check
       if (!name) {
@@ -122,6 +130,28 @@ class AgentController extends BaseController {
           message: "Please provide all necessary fields",
         });
       }
+      if (startTime === undefined || endTime === undefined) {
+        return res.status(400).send({
+          success: false,
+          message: "Start time and end time are required",
+        });
+      }
+
+      if (
+        !Number.isInteger(startTime) ||
+        !Number.isInteger(endTime) ||
+        startTime < 0 ||
+        startTime > 23 ||
+        endTime < 0 ||
+        endTime > 23 ||
+        startTime >= endTime
+      ) {
+        return res.status(400).send({
+          success: false,
+          message:
+            "Invalid start time or end time. Must be integers between 0 and 23, and start time must be before end time.",
+        });
+      }
       // Validate name
       const nameError = isValidLength(name);
       if (nameError) {
@@ -172,7 +202,7 @@ class AgentController extends BaseController {
       if (passwordValidationResult) {
         return res.status(400).send({
           success: false,
-          message: passwordValidationResult
+          message: passwordValidationResult,
         });
       }
       const hashedPassword = await bcrypt.hash(password, 10);
@@ -187,6 +217,9 @@ class AgentController extends BaseController {
           phone,
           password: hashedPassword,
           emailToken,
+          isEmailVerified: true,
+          startTime,
+          endTime,
         },
         { transaction }
       );
@@ -215,7 +248,8 @@ class AgentController extends BaseController {
   signupByAdmin = async (req, res) => {
     const transaction = await sequelize.transaction();
     try {
-      const { name, email, phone, password } = req.body;
+      const { name, email, phone, password, startTime, endTime } = req.body;
+
       // mandatory field check
       if (!name) {
         return res
@@ -238,14 +272,37 @@ class AgentController extends BaseController {
           .send({ success: false, message: "Password is required" });
       }
 
+      // Validate input fields
       if (
         [name, email, phone, password].some((field) => field?.trim() === "")
       ) {
-        return res
-          .status(400)
-          .send({ message: "Please provide all necessary fields" });
+        return res.status(400).send({
+          success: false,
+          message: "Please provide all necessary fields",
+        });
+      }
+      if (startTime === undefined || endTime === undefined) {
+        return res.status(400).send({
+          success: false,
+          message: "Start time and end time are required",
+        });
       }
 
+      if (
+        !Number.isInteger(startTime) ||
+        !Number.isInteger(endTime) ||
+        startTime < 0 ||
+        startTime > 23 ||
+        endTime < 0 ||
+        endTime > 23 ||
+        startTime >= endTime
+      ) {
+        return res.status(400).send({
+          success: false,
+          message:
+            "Invalid start time or end time. Must be integers between 0 and 23, and start time must be before end time.",
+        });
+      }
       // Validate name
       const nameError = isValidLength(name);
       if (nameError) {
@@ -297,7 +354,7 @@ class AgentController extends BaseController {
       if (passwordValidationResult) {
         return res.status(400).send({
           success: false,
-          message: passwordValidationResult
+          message: passwordValidationResult,
         });
       }
       const hashedPassword = await bcrypt.hash(password, 10);
@@ -312,6 +369,8 @@ class AgentController extends BaseController {
           password: hashedPassword,
           emailToken,
           isEmailVerified: true,
+          startTime,
+          endTime,
         },
         { transaction }
       );
@@ -406,12 +465,10 @@ class AgentController extends BaseController {
   signin = async (req, res) => {
     const { email, password } = req.body;
     if ([email, password].some((field) => field?.trim() === "")) {
-      return res
-        .status(400)
-        .send({
-          success: false,
-          message: "Please provide all necessary fields",
-        });
+      return res.status(400).send({
+        success: false,
+        message: "Please provide all necessary fields",
+      });
     }
     if (!email || !password) {
       return res
@@ -556,12 +613,10 @@ class AgentController extends BaseController {
 
     // Validate input fields
     if (!password || !otp) {
-      return res
-        .status(400)
-        .send({
-          success: false,
-          message: "Missing required fields: password or OTP",
-        });
+      return res.status(400).send({
+        success: false,
+        message: "Missing required fields: password or OTP",
+      });
     }
     if (!agentId) {
       return res
@@ -625,10 +680,10 @@ class AgentController extends BaseController {
 
     try {
       // Convert email to lowercase before querying
-    const lowercaseEmail = email.toLowerCase().trim();
+      const lowercaseEmail = email.toLowerCase().trim();
       const agent = await models.Agent.findOne({
         where: {
-          email:lowercaseEmail,
+          email: lowercaseEmail,
         },
       });
 
@@ -675,19 +730,39 @@ class AgentController extends BaseController {
   updateAgentByAdmin = async (req, res) => {
     try {
       const id = req.params.id;
+      const { startTime, endTime, ...otherFields } = req.body;
 
-      if ("password" in req.body) {
-        return res
-          .status(400)
-          .json({
-            success: false,
-            error: "Password cannot be updated by Admin",
-          });
+      if ("password" in otherFields) {
+        return res.status(400).json({
+          success: false,
+          error: "Password cannot be updated by Admin",
+        });
       }
 
-      const [updatedRows] = await this.model.update(req.body, {
-        where: { id: id },
-      });
+      if (startTime !== undefined || endTime !== undefined) {
+        if (
+          !Number.isInteger(startTime) ||
+          !Number.isInteger(endTime) ||
+          startTime < 0 ||
+          startTime > 23 ||
+          endTime < 0 ||
+          endTime > 23 ||
+          startTime >= endTime
+        ) {
+          return res.status(400).send({
+            success: false,
+            message:
+              "Invalid start time or end time. Must be integers between 0 and 23, and start time must be before end time.",
+          });
+        }
+      }
+
+      const [updatedRows] = await this.model.update(
+        { ...otherFields, startTime, endTime },
+        {
+          where: { id: id },
+        }
+      );
 
       if (updatedRows > 0) {
         const updatedItem = await this.model.findByPk(id, {
@@ -765,12 +840,293 @@ class AgentController extends BaseController {
       }
     } catch (error) {
       console.error("Update error:", error);
-      res
-        .status(500)
-        .json({
+      res.status(500).json({
+        success: false,
+        error: "An error occurred while updating the item",
+      });
+    }
+  };
+  // agent availability
+  getAgentAvailability = async (req, res) => {
+    try {
+      const { agentId, date } = req.query;
+
+      if (!agentId || !date) {
+        return res.status(400).send({
           success: false,
-          error: "An error occurred while updating the item",
+          message: "Agent ID and date are required",
         });
+      }
+      // Parse and validate the date
+      const parsedDate = moment(date, ["DD-MM-YYYY", "YYYY-MM-DD"], true);
+      if (!parsedDate.isValid()) {
+        return res.status(400).send({
+          success: false,
+          message: "Invalid date format. Please use DD-MM-YYYY.",
+        });
+      }
+
+      const agent = await models.Agent.findByPk(agentId);
+      if (!agent) {
+        return res.status(404).send({
+          success: false,
+          message: "Agent not found",
+        });
+      }
+
+      const startOfDay = parsedDate.startOf("day");
+      const endOfDay = parsedDate.endOf("day");
+
+      const assignments = await models.Assignment.findAll({
+        where: {
+          AgentId: agentId,
+          startTime: {
+            [Op.between]: [startOfDay.toDate(), endOfDay.toDate()],
+          },
+        },
+        order: [["startTime", "ASC"]],
+      });
+
+      const availabilitySlots = [];
+      let currentTime = moment(startOfDay).hour(agent.startTime);
+      const dayEndTime = moment(startOfDay).hour(agent.endTime);
+
+      while (currentTime.isBefore(dayEndTime)) {
+        const slotEnd = moment.min(
+          currentTime.clone().add(1, "hour"),
+          dayEndTime
+        );
+
+        const conflictingAssignments = assignments.filter(
+          (assignment) =>
+            moment(assignment.startTime).isBefore(slotEnd.toDate()) &&
+            moment(assignment.endTime).isAfter(currentTime.toDate())
+        );
+
+        if (conflictingAssignments.length === 0) {
+          availabilitySlots.push({
+            startTime: currentTime.toDate(),
+            endTime: slotEnd.toDate(),
+            available: true,
+            duration: slotEnd.diff(currentTime, "minutes"),
+          });
+        } else {
+          // Handle partial availability within the hour
+          let availableStart = currentTime.clone();
+          conflictingAssignments.forEach((assignment) => {
+            if (moment(assignment.startTime).isAfter(availableStart)) {
+              availabilitySlots.push({
+                startTime: availableStart.toDate(),
+                endTime: moment(assignment.startTime).toDate(),
+                available: true,
+                duration: moment(assignment.startTime).diff(
+                  availableStart,
+                  "minutes"
+                ),
+              });
+            }
+            availableStart = moment.max(
+              availableStart,
+              moment(assignment.endTime)
+            );
+          });
+
+          if (availableStart.isBefore(slotEnd)) {
+            availabilitySlots.push({
+              startTime: currentTime.toDate(),
+              endTime: slotEnd.toDate(),
+              available: true,
+              duration: slotEnd.diff(currentTime, "minutes"),
+              selected: false,
+            });
+          }
+        }
+
+        currentTime = slotEnd;
+      }
+
+      res.status(200).send({
+        success: true,
+        data: availabilitySlots,
+      });
+    } catch (error) {
+      res.status(500).send({
+        success: false,
+        message:
+          error.message ||
+          "An error occurred while fetching agent availability.",
+      });
+    }
+  };
+  assignJobCardToAgent = async (req, res) => {
+    try {
+      const { jobCardId, agentId, selectedSlots } = req.body;
+  
+      if (!jobCardId || !agentId || !selectedSlots || !Array.isArray(selectedSlots) || selectedSlots.length === 0) {
+        return res.status(400).json({ error: "JobCard ID, Agent ID, and selected slots are required and selected slots must be an array" });
+      }
+  
+      const jobCard = await models.JobCard.findByPk(jobCardId);
+      const agent = await models.Agent.findByPk(agentId);
+      if (!jobCard || !agent) {
+        return res.status(404).json({ error: "JobCard or Agent not found" });
+      }
+  
+      const jobPost = await models.JobPost.findByPk(jobCard.JobPostId);
+      if (!jobPost) {
+        return res.status(404).json({ error: "Associated JobPost not found" });
+      }
+  
+      // Sort selected slots by start time
+      const sortedSlots = selectedSlots.sort((a, b) => moment(a.startTime).diff(moment(b.startTime)));
+  
+      // Check if slots are within working hours
+      const workStartTime = moment(sortedSlots[0].startTime).startOf("day").add(agent.startTime, "hours");
+      const workEndTime = moment(sortedSlots[0].startTime).startOf("day").add(agent.endTime, "hours");
+  
+      if (moment(sortedSlots[0].startTime).isBefore(workStartTime) || 
+          moment(sortedSlots[sortedSlots.length - 1].endTime).isAfter(workEndTime)) {
+        return res.status(400).json({
+          error: "The assignment is outside of the agent's working hours",
+        });
+      }
+  
+      // Merge consecutive or overlapping slots
+      const mergedSlots = [];
+      let currentSlot = sortedSlots[0];
+  
+      for (let i = 1; i < sortedSlots.length; i++) {
+        if (moment(sortedSlots[i].startTime).diff(moment(currentSlot.endTime), 'minutes') <= 5) {
+          // Merge overlapping or adjacent slots
+          currentSlot.endTime = moment.max(moment(currentSlot.endTime), moment(sortedSlots[i].endTime)).toDate();
+        } else {
+          mergedSlots.push(currentSlot);
+          currentSlot = sortedSlots[i];
+        }
+      }
+      mergedSlots.push(currentSlot); // Add the last slot
+  
+      // Check for conflicting assignments
+      for (const slot of mergedSlots) {
+        const conflictingAssignments = await models.Assignment.findAll({
+          where: {
+            AgentId: agentId,
+            [Op.or]: [
+              {
+                startTime: { [Op.lt]: moment(slot.endTime).toDate() },
+                endTime: { [Op.gt]: moment(slot.startTime).toDate() },
+              },
+              {
+                startTime: { [Op.between]: [slot.startTime, moment(slot.endTime).toDate()] },
+              },
+              {
+                endTime: { [Op.between]: [slot.startTime, moment(slot.endTime).toDate()] },
+              },
+            ],
+          },
+        });
+  
+        if (conflictingAssignments.length > 0) {
+          return res.status(400).json({ error: "There are conflicting assignments for the selected time slots" });
+        }
+      }
+  
+      // Create assignments for each merged slot
+      const createdAssignments = [];
+      for (const slot of mergedSlots) {
+        const assignment = await models.Assignment.create({
+          AgentId: agentId,
+          JobCardId: jobCardId,
+          startTime: slot.startTime,
+          endTime: slot.endTime,
+          status: "Scheduled",
+        });
+        createdAssignments.push(assignment);
+      }
+  
+      // Update JobCard status and lastUpdatedByAgent
+      jobCard.status = "Ongoing";
+      jobCard.lastUpdatedByAgent = agentId; // Ensure agentId exists in the correct table
+      await jobCard.save();
+  
+      // Update agent's jobInHand
+      agent.jobInHand += 1;
+      await agent.save();
+  
+      return res.status(200).json({ 
+        message: "Job card assigned successfully", 
+        assignments: createdAssignments 
+      });
+    } catch (error) {
+      console.error("Error in assignJobCardToAgent:", error);
+      return res.status(500).json({ error: "Internal server error" });
+    }
+  };
+  
+  removeJobCardFromAgent = async (req, res) => {
+    try {
+      const { jobCardId, agentId } = req.body;
+
+      if (!jobCardId || !agentId) {
+        return res
+          .status(400)
+          .json({ error: "JobCard ID and Agent ID are required" });
+      }
+
+      const jobCard = await models.JobCard.findByPk(jobCardId);
+      const agent = await models.Agent.findByPk(agentId);
+      if (!jobCard || !agent) {
+        return res.status(404).json({ error: "JobCard or Agent not found" });
+      }
+
+      const assignment = await models.Assignment.findOne({
+        where: {
+          JobCardId: jobCardId,
+          AgentId: agentId,
+          status: { [Op.ne]: "Completed" },
+        },
+      });
+
+      if (!assignment) {
+        return res.status(400).json({
+          error: "This job card is not assigned to the specified agent",
+        });
+      }
+
+      await assignment.destroy();
+
+      jobCard.status = "Open";
+      jobCard.lastUpdatedBy = null;
+      await jobCard.save();
+
+      agent.jobInHand -= 1;
+      await agent.save();
+
+      return res.status(200).json({ message: "Job card removed successfully" });
+    } catch (error) {
+      console.error("Error in removeJobCardFromAgent:", error);
+      return res.status(500).json({ error: "Internal server error" });
+    }
+  };
+  getAgentJobCardCounts = async (req, res) => {
+    try {
+      const { agentId } = req.params;
+      const agent = await models.Agent.findByPk(agentId);
+      if (!agent) {
+        return res.status(404).json({ error: "Agent not found" });
+      }
+      const totalJobCards = await models.JobCard.count();
+      const assignedJobCards = await models.Assignment.count({
+        where: { AgentId: agentId },
+      });
+      res.status(200).json({
+        totalJobCards,
+        assignedJobCards,
+        remainingJobCards: totalJobCards - assignedJobCards,
+      });
+    } catch (error) {
+      console.error("Error in getAgentJobCardCounts:", error);
+      return res.status(500).json({ error: "Internal server error" });
     }
   };
 }
