@@ -6,7 +6,7 @@ const models = {
     Organization: require('./Organization.model.js')(db.sequelize, db.Sequelize.DataTypes),
     JobPost: require('./JobPost.model.js')(db.sequelize, db.Sequelize.DataTypes),
     JobCard: require('./JobCard.model.js')(db.sequelize, db.Sequelize.DataTypes),
-    Assignment:require('./Assignment.model.js')(db.sequelize, db.Sequelize.DataTypes)
+    DailySlot:require('./DailySlot.model.js')(db.sequelize, db.Sequelize.DataTypes)
 };
 
 // Define relationships
@@ -32,14 +32,12 @@ models.JobCard.belongsTo(models.Admin, { foreignKey: 'lastUpdatedByAdmin' });
 models.Agent.hasMany(models.JobCard, { as: 'updatedJobCardsByAgent', foreignKey: 'lastUpdatedByAgent' });
 models.JobCard.belongsTo(models.Agent, { foreignKey: 'lastUpdatedByAgent' });
 
+// DailySlot associations
+models.DailySlot.belongsTo(models.Agent);
+models.Agent.hasMany(models.DailySlot, { foreignKey: 'agentId' });
 
-
-// Assignment associations
-models.Agent.hasMany(models.Assignment);
-models.Assignment.belongsTo(models.Agent);
-
-models.JobCard.hasMany(models.Assignment);
-models.Assignment.belongsTo(models.JobCard);
+models.DailySlot.belongsTo(models.JobPost);
+models.JobPost.hasMany(models.DailySlot, { foreignKey: 'JobPostId' });
 
 models.db = db;
 module.exports = models;

@@ -4,6 +4,7 @@ const BaseController = require("./base");
 const models = require("../models");
 const {
   isValidEmail,
+  isValidCountryCode,
   isValidPhone,
   isValidPassword,
   isValidLength,
@@ -100,6 +101,7 @@ class OrganizationController extends BaseController {
         description,
         contact_person_name,
         email,
+        countryCode,
         phone,
         password,
         location,
@@ -130,6 +132,11 @@ class OrganizationController extends BaseController {
           .status(400)
           .send({ success: false, message: "Email is required" });
       }
+      if (!countryCode) {
+        return res
+          .status(400)
+          .send({ success: false, message: "Country Code is required" });
+      }
       if (!phone) {
         return res
           .status(400)
@@ -153,6 +160,7 @@ class OrganizationController extends BaseController {
           type,
           contact_person_name,
           email,
+          countryCode,
           phone,
           password,
           location,
@@ -175,6 +183,10 @@ class OrganizationController extends BaseController {
         return res
           .status(400)
           .send({ success: false, message: contactPersonNameError });
+      }
+      const countryCodeError = isValidCountryCode(countryCode);
+      if (countryCodeError) {
+        return res.status(400).send({ success: false, message: countryCodeError });
       }
       if (!isValidPhone(phone)) {
         return res
@@ -302,6 +314,7 @@ class OrganizationController extends BaseController {
           description,
           contact_person_name,
           email,
+          countryCode:countryCode,
           phone,
           password: hashedPassword,
           location,
@@ -340,6 +353,7 @@ class OrganizationController extends BaseController {
         description,
         contact_person_name,
         email,
+        countryCode,
         phone,
         password,
         location,
@@ -371,6 +385,11 @@ class OrganizationController extends BaseController {
           .status(400)
           .send({ success: false, message: "Email is required" });
       }
+      if(!countryCode){
+        return res
+        .status(400)
+        .send({ success: false, message: "Country Code is required" });
+      }
       if (!phone) {
         return res
           .status(400)
@@ -393,6 +412,7 @@ class OrganizationController extends BaseController {
           type,
           contact_person_name,
           email,
+          countryCode,
           phone,
           password,
           location,
@@ -414,6 +434,11 @@ class OrganizationController extends BaseController {
         return res
           .status(400)
           .send({ success: false, message: contactPersonNameError });
+      }
+      // validate country code
+      const countryCodeError = isValidCountryCode(countryCode);
+      if (countryCodeError) {
+        return res.status(400).send({ success: false, message: countryCodeError });
       }
       // validate phone
       if (!isValidPhone(phone)) {
@@ -478,6 +503,7 @@ class OrganizationController extends BaseController {
           description,
           contact_person_name,
           email,
+          countryCode:countryCode,
           phone,
           password: hashedPassword,
           location,

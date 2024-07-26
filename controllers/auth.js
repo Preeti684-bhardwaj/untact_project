@@ -142,6 +142,7 @@ console.log(token);
 exports.authorizeAdmin = async (req, res, next) => {
     const id = req.userId;
     const type=req.userType;
+    console.log(id,type);
 try{
     if (type === 'ADMIN') {
         const admin = await models.Admin.findByPk(id);

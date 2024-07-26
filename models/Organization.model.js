@@ -17,6 +17,7 @@ module.exports = (sequelize, DataTypes) => {
             type: DataTypes.STRING,
             allowNull: false
         },
+        countryCode:DataTypes.TEXT,
         phone: DataTypes.STRING,
         password: {
             type: DataTypes.STRING,

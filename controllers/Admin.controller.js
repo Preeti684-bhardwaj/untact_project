@@ -5,6 +5,7 @@ const models = require("../models");
 const {
   isValidEmail,
   isValidPhone,
+  isValidCountryCode,
   isValidPassword,
   isValidLength,
 } = require("../utils/validation");
@@ -77,7 +78,7 @@ class AdminController extends BaseController {
     let transaction;
     try {
       transaction = await sequelize.transaction();
-      const { name, email, phone, password } = req.body;
+      const { name, email,countryCode, phone, password } = req.body;
       // mandatory field check
       if (!name) {
         return res
@@ -88,6 +89,11 @@ class AdminController extends BaseController {
         return res
           .status(400)
           .send({ success: false, message: "Email is required" });
+      }
+      if (!countryCode) {
+        return res
+          .status(400)
+          .send({ success: false, message: "countryCode is required" });
       }
       if (!phone) {
         return res
@@ -102,7 +108,7 @@ class AdminController extends BaseController {
 
       // Validate input fields
       if (
-        [name, email, phone, password].some((field) => field?.trim() === "")
+        [name, email,countryCode, phone, password].some((field) => field?.trim() === "")
       ) {
         return res
           .status(400)
@@ -122,7 +128,10 @@ class AdminController extends BaseController {
           .status(400)
           .send({ success: false, message: "Invalid email" });
       }
-
+      const countryCodeError = isValidCountryCode(countryCode);
+      if (countryCodeError) {
+        return res.status(400).send({ success: false, message: countryCodeError });
+      }
       if (!isValidPhone(phone)) {
         return res
           .status(400)
@@ -173,6 +182,7 @@ class AdminController extends BaseController {
         {
           name,
           email: email.toLowerCase(),
+          countryCode:countryCode,
           phone,
           password: hashedPassword,
           emailToken,
@@ -284,7 +294,7 @@ class AdminController extends BaseController {
     }
     try {
       const admin = await models.Admin.findOne({
-        where: { email: email.trim() },
+        where: { email: email.toLowerCase().trim() },
       });
       if (!admin) {
         return res
@@ -373,7 +383,7 @@ class AdminController extends BaseController {
       // Find the admin by email
       const admin = await models.Admin.findOne({
         where: {
-          email: email.trim(),
+          email: email.toLowerCase().trim(),
         },
       });
 
@@ -423,18 +433,33 @@ class AdminController extends BaseController {
     const adminId = req.params.adminId;
 
     // Validate input fields
-    if (!password || !otp) {
+    if (!password) {
       return res
         .status(400)
         .send({
           success: false,
-          message: "Missing required fields: password or OTP",
+          message: "Missing password",
+        });
+    }
+    if (!otp) {
+      return res
+        .status(400)
+        .send({
+          success: false,
+          message: "Missing OTP",
         });
     }
     if (!adminId) {
       return res
         .status(400)
         .send({ success: false, message: "Missing AdminId in the params" });
+    }
+    const passwordValidationResult = isValidPassword(password);
+    if (passwordValidationResult) {
+      return res.status(400).send({
+        success: false,
+        message: passwordValidationResult
+      });
     }
     const hashedPassword = await bcrypt.hash(password, 10);
     try {
@@ -551,6 +576,14 @@ class AdminController extends BaseController {
         }
       }
       if (email) {
+        if (
+          [email].some((field) => field?.trim() === "")
+        ) {
+          return res.status(400).send({
+            success: false,
+            message: "Missing email",
+          });
+        }
         if (!isValidEmail(email)) {
           return res
             .status(400)
@@ -558,6 +591,14 @@ class AdminController extends BaseController {
         }
       }
       if (phone) {
+        if (
+          [phone].some((field) => field?.trim() === "")
+        ) {
+          return res.status(400).send({
+            success: false,
+            message: "Missing Phone",
+          });
+        }
         if (!isValidPhone(phone)) {
           return res
             .status(400)

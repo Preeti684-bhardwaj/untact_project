@@ -13,6 +13,7 @@ module.exports = (sequelize, DataTypes) => {
             allowNull: false
         },
         job_description: DataTypes.TEXT,
+        fileName:DataTypes.STRING,
         jobCards:DataTypes.JSON,
         priority: DataTypes.ENUM('Low','Medium','High'),
         due_date:DataTypes.DATE,

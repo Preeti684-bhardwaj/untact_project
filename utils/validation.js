@@ -65,6 +65,40 @@ const isValidLength = (name) => {
   // }
   return null;  // No errors
 };
+const isValidCountryCode = (countryCode) => {
+  // List of valid country codes (this is a sample, not exhaustive)
+  // const validCodes = ['+1', '+44', '+91', '+86', '+81', '+49', '+33', '+7', '+61', '+55'];
+
+  // Remove any whitespace
+  const cleanCode = countryCode.replace(/\s/g, '');
+
+  if (cleanCode.length === 0) {
+    return { isValid: false, message: "Country code cannot be empty." };
+  }
+
+  if (!cleanCode.startsWith('+')) {
+    return { isValid: false, message: "Country code must start with '+'." };
+  }
+
+  if (!/^\+\d{1,4}$/.test(cleanCode)) {
+    return { isValid: false, message: "Invalid format. Use '+' followed by 1-4 digits." };
+  }
+
+  // if (!validCodes.includes(cleanCode)) {
+  //   return { isValid: false, message: "Not a recognized country code." };
+  // }
+
+  return null
+};
+
+// Function to validate time string
+function isValidTimeString(timeString) {
+  return moment(timeString, 'HH:mm:ss', true).isValid();
+}
+
+function parseTimeString(timeString) {
+  return moment(timeString, 'HH:mm:ss');
+}
 
 // const isValidLength = name => name.length >= 4 && name.length<=40 && !/^\d/.test(name)
 
@@ -74,9 +108,39 @@ const isValidLength = (name) => {
 
 // const isValidEndTime = (startTime, endTime) => moment(endTime).isAfter(startTime);
 
+function updateDailySlotAvailability(existingSlots, selectedSlots) {
+  // Deep clone the existing slots to avoid mutating the original data
+  const updatedSlots = JSON.parse(JSON.stringify(existingSlots));
+
+  selectedSlots.forEach(selectedSlot => {
+    const selectedStart = new Date(selectedSlot.startTime);
+    const selectedEnd = new Date(selectedSlot.endTime);
+
+    updatedSlots.forEach(slot => {
+      const slotStart = new Date(slot.slot.start);
+      const slotEnd = new Date(slot.slot.end);
+
+      // Check if the selected slot overlaps with this slot
+      if (selectedStart < slotEnd && selectedEnd > slotStart) {
+        // Filter out mini slots that overlap with the selected slot
+        slot.availableMiniSlots = slot.availableMiniSlots.filter(miniSlot => {
+          const miniStart = new Date(miniSlot.start);
+          const miniEnd = new Date(miniSlot.end);
+          return miniEnd <= selectedStart || miniStart >= selectedEnd;
+        });
+      }
+    });
+  });
+
+  return updatedSlots;
+}
 module.exports = {
   isValidEmail,
   isValidPhone,
+  isValidCountryCode,
+  isValidTimeString,
+  parseTimeString,
+  updateDailySlotAvailability,
 //   isDateGreterThanToday,
 //   isValidStartTime,
 //   isValidEndTime,

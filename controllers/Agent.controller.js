@@ -4,12 +4,16 @@ const BaseController = require("./base");
 const models = require("../models");
 const {
   isValidEmail,
+  isValidCountryCode,
   isValidPhone,
   isValidPassword,
+  isValidTimeString,
+  parseTimeString,
   isValidLength,
+  updateDailySlotAvailability,
 } = require("../utils/validation");
-const moment = require("moment");
 const sendEmail = require("../utils/sendEmail.js");
+const moment = require("moment");
 const { Op } = require("sequelize");
 const sequelize = require("../config/db.config").sequelize; // Ensure this path is correct
 const { authenticate, authorizeAdmin } = require("../controllers/auth");
@@ -60,7 +64,10 @@ class AgentController extends BaseController {
     );
     this.router.put("/updateByAgent/:id", this.updateByAgent.bind(this));
     this.router.get("/availability", this.getAgentAvailability.bind(this));
-    this.router.post("/assignJobCard", this.assignJobCardToAgent.bind(this));
+    this.router.post(
+      "/assignJobCard/:jobPostId",
+      this.assignJobCardToAgent.bind(this)
+    );
     this.router.post("/removeJobCard", this.removeJobCardFromAgent.bind(this));
     this.router.get(
       "/jobCardCounts/:agentId",
@@ -97,7 +104,8 @@ class AgentController extends BaseController {
   signupByAgent = async (req, res) => {
     const transaction = await sequelize.transaction();
     try {
-      const { name, email, phone, password, startTime, endTime } = req.body;
+      const { name, email, countryCode, phone, password, startTime, endTime } =
+        req.body;
 
       // mandatory field check
       if (!name) {
@@ -110,6 +118,11 @@ class AgentController extends BaseController {
           .status(400)
           .send({ success: false, message: "Email is required" });
       }
+      if (!countryCode) {
+        return res
+          .status(400)
+          .send({ success: false, message: "countryCode is required" });
+      }
       if (!phone) {
         return res
           .status(400)
@@ -120,44 +133,62 @@ class AgentController extends BaseController {
           .status(400)
           .send({ success: false, message: "Password is required" });
       }
-
-      // Validate input fields
-      if (
-        [name, email, phone, password].some((field) => field?.trim() === "")
-      ) {
-        return res.status(400).send({
-          success: false,
-          message: "Please provide all necessary fields",
-        });
-      }
-      if (startTime === undefined || endTime === undefined) {
+      if (!startTime || !endTime) {
         return res.status(400).send({
           success: false,
           message: "Start time and end time are required",
         });
       }
 
-      if (
-        !Number.isInteger(startTime) ||
-        !Number.isInteger(endTime) ||
-        startTime < 0 ||
-        startTime > 23 ||
-        endTime < 0 ||
-        endTime > 23 ||
-        startTime >= endTime
-      ) {
+      // Validate required fields
+      const requiredFields = {
+        name,
+        email,
+        countryCode,
+        phone,
+        password,
+        startTime,
+        endTime,
+      };
+      for (const [field, value] of Object.entries(requiredFields)) {
+        if (!value) {
+          await transaction.rollback();
+          return res
+            .status(400)
+            .send({ success: false, message: `${field} is required` });
+        }
+      }
+      if (!isValidTimeString(startTime) || !isValidTimeString(endTime)) {
+        await transaction.rollback();
         return res.status(400).send({
           success: false,
           message:
-            "Invalid start time or end time. Must be integers between 0 and 23, and start time must be before end time.",
+            "Invalid time format. Please provide times in HH:mm:ss format.",
         });
       }
+
+      const startMoment = parseTimeString(startTime);
+      const endMoment = parseTimeString(endTime);
+
+      if (startMoment.isSameOrAfter(endMoment)) {
+        await transaction.rollback();
+        return res.status(400).send({
+          success: false,
+          message: "Start time must be before end time.",
+        });
+      }
+
       // Validate name
       const nameError = isValidLength(name);
       if (nameError) {
         return res.status(400).send({ success: false, message: nameError });
       }
-
+      const countryCodeError = isValidCountryCode(countryCode);
+      if (countryCodeError) {
+        return res
+          .status(400)
+          .send({ success: false, message: countryCodeError });
+      }
       if (!isValidPhone(phone)) {
         return res
           .status(400)
@@ -172,7 +203,7 @@ class AgentController extends BaseController {
       const existingAgent = await models.Agent.findOne(
         {
           where: {
-            [Op.or]: [{ email: email.toLowerCase() }, { phone: phone }],
+            [Op.or]: [{ email: email.toLowerCase().trim() }, { phone: phone }],
           },
         },
         { transaction }
@@ -181,14 +212,14 @@ class AgentController extends BaseController {
       if (existingAgent) {
         await transaction.rollback();
         if (
-          existingAgent.email.toLowerCase() === email.toLowerCase() &&
+          existingAgent.email === email.toLowerCase().trim() &&
           existingAgent.phone === phone
         ) {
           return res.status(400).send({
             success: false,
             message: "Both email and phone number are already in use",
           });
-        } else if (existingAgent.email.toLowerCase() === email.toLowerCase()) {
+        } else if (existingAgent.email === email.toLowerCase().trim()) {
           return res
             .status(400)
             .send({ success: false, message: "Email already in use" });
@@ -208,12 +239,13 @@ class AgentController extends BaseController {
       const hashedPassword = await bcrypt.hash(password, 10);
 
       // If no existing admin, create a new one
-      const emailToken = generateToken({ email: email.toLowerCase() });
+      const emailToken = generateToken({ email: email.toLowerCase().trim() });
 
       const newAgent = await models.Agent.create(
         {
           name,
-          email: email.toLowerCase(),
+          email: email.toLowerCase().trim(),
+          countryCode: countryCode,
           phone,
           password: hashedPassword,
           emailToken,
@@ -248,7 +280,8 @@ class AgentController extends BaseController {
   signupByAdmin = async (req, res) => {
     const transaction = await sequelize.transaction();
     try {
-      const { name, email, phone, password, startTime, endTime } = req.body;
+      const { name, email, countryCode, phone, password, startTime, endTime } =
+        req.body;
 
       // mandatory field check
       if (!name) {
@@ -261,6 +294,11 @@ class AgentController extends BaseController {
           .status(400)
           .send({ success: false, message: "Email is required" });
       }
+      if (!countryCode) {
+        return res
+          .status(400)
+          .send({ success: false, message: "countryCode is required" });
+      }
       if (!phone) {
         return res
           .status(400)
@@ -271,42 +309,66 @@ class AgentController extends BaseController {
           .status(400)
           .send({ success: false, message: "Password is required" });
       }
-
-      // Validate input fields
-      if (
-        [name, email, phone, password].some((field) => field?.trim() === "")
-      ) {
-        return res.status(400).send({
-          success: false,
-          message: "Please provide all necessary fields",
-        });
-      }
-      if (startTime === undefined || endTime === undefined) {
+      if (!startTime || !endTime) {
         return res.status(400).send({
           success: false,
           message: "Start time and end time are required",
         });
       }
 
-      if (
-        !Number.isInteger(startTime) ||
-        !Number.isInteger(endTime) ||
-        startTime < 0 ||
-        startTime > 23 ||
-        endTime < 0 ||
-        endTime > 23 ||
-        startTime >= endTime
-      ) {
+      // Validate required fields
+      const requiredFields = {
+        name,
+        email,
+        countryCode,
+        phone,
+        password,
+        startTime,
+        endTime,
+      };
+      for (const [field, value] of Object.entries(requiredFields)) {
+        if (!value) {
+          await transaction.rollback();
+          return res
+            .status(400)
+            .send({ success: false, message: `${field} is required` });
+        }
+      }
+      if (!isValidTimeString(startTime) || !isValidTimeString(endTime)) {
+        await transaction.rollback();
         return res.status(400).send({
           success: false,
           message:
-            "Invalid start time or end time. Must be integers between 0 and 23, and start time must be before end time.",
+            "Invalid time format. Please provide times in HH:mm:ss format.",
         });
       }
+
+      const startMoment = parseTimeString(startTime);
+      const endMoment = parseTimeString(endTime);
+
+      if (startMoment.isSameOrAfter(endMoment)) {
+        await transaction.rollback();
+        return res.status(400).send({
+          success: false,
+          message: "Start time must be before end time.",
+        });
+      }
+
       // Validate name
       const nameError = isValidLength(name);
       if (nameError) {
         return res.status(400).send({ success: false, message: nameError });
+      }
+      const countryCodeError = isValidCountryCode(countryCode);
+      if (countryCodeError) {
+        return res
+          .status(400)
+          .send({ success: false, message: countryCodeError });
+      }
+      if (!isValidPhone(phone)) {
+        return res
+          .status(400)
+          .send({ success: false, message: "Invalid Phone Number" });
       }
 
       if (!isValidEmail(email)) {
@@ -315,16 +377,10 @@ class AgentController extends BaseController {
           .send({ success: false, message: "Invalid email" });
       }
 
-      if (!isValidPhone(phone)) {
-        return res
-          .status(400)
-          .send({ success: false, message: "Invalid Phone Number" });
-      }
-
       const existingAgent = await models.Agent.findOne(
         {
           where: {
-            [Op.or]: [{ email: email.toLowerCase() }, { phone: phone }],
+            [Op.or]: [{ email: email.toLowerCase().trim() }, { phone: phone }],
           },
         },
         { transaction }
@@ -333,14 +389,14 @@ class AgentController extends BaseController {
       if (existingAgent) {
         await transaction.rollback();
         if (
-          existingAgent.email.toLowerCase() === email.toLowerCase() &&
+          existingAgent.email === email.toLowerCase().trim() &&
           existingAgent.phone === phone
         ) {
           return res.status(400).send({
             success: false,
             message: "Both email and phone number are already in use",
           });
-        } else if (existingAgent.email.toLowerCase() === email.toLowerCase()) {
+        } else if (existingAgent.email === email.toLowerCase().trim()) {
           return res
             .status(400)
             .send({ success: false, message: "Email already in use" });
@@ -358,13 +414,14 @@ class AgentController extends BaseController {
         });
       }
       const hashedPassword = await bcrypt.hash(password, 10);
-      // If no existing admin, create a new one
-      const emailToken = generateToken({ email: email.toLowerCase() });
 
+      // If no existing admin, create a new one
+      const emailToken = generateToken({ email: email.toLowerCase().trim() });
       const newAgent = await models.Agent.create(
         {
           name,
-          email: email.toLowerCase(),
+          email: email.toLowerCase().trim(),
+          countryCode: countryCode,
           phone,
           password: hashedPassword,
           emailToken,
@@ -477,7 +534,7 @@ class AgentController extends BaseController {
     }
     try {
       const agent = await models.Agent.findOne({
-        where: { email: email.trim() },
+        where: { email: email.toLowerCase().trim() },
       });
       if (!agent) {
         return res
@@ -562,7 +619,7 @@ class AgentController extends BaseController {
       // Find the agent by email
       const agent = await models.Agent.findOne({
         where: {
-          email: email.trim(),
+          email: email.toLowerCase().trim(),
         },
       });
 
@@ -612,16 +669,29 @@ class AgentController extends BaseController {
     const agentId = req.params.agentId;
 
     // Validate input fields
-    if (!password || !otp) {
+    if (!password) {
       return res.status(400).send({
         success: false,
-        message: "Missing required fields: password or OTP",
+        message: "Missing password",
+      });
+    }
+    if (!otp) {
+      return res.status(400).send({
+        success: false,
+        message: "Missing OTP",
       });
     }
     if (!agentId) {
       return res
         .status(400)
         .send({ success: false, message: "Missing AgentId in the params" });
+    }
+    const passwordValidationResult = isValidPassword(password);
+    if (passwordValidationResult) {
+      return res.status(400).send({
+        success: false,
+        message: passwordValidationResult,
+      });
     }
     const hashedPassword = await bcrypt.hash(password, 10);
 
@@ -738,26 +808,82 @@ class AgentController extends BaseController {
           error: "Password cannot be updated by Admin",
         });
       }
-
-      if (startTime !== undefined || endTime !== undefined) {
+      if (startTime || endTime) {
         if (
-          !Number.isInteger(startTime) ||
-          !Number.isInteger(endTime) ||
-          startTime < 0 ||
-          startTime > 23 ||
-          endTime < 0 ||
-          endTime > 23 ||
-          startTime >= endTime
+          !isValidGMTTimeString(startTime) ||
+          !isValidGMTTimeString(endTime)
         ) {
+          await transaction.rollback();
           return res.status(400).send({
             success: false,
             message:
-              "Invalid start time or end time. Must be integers between 0 and 23, and start time must be before end time.",
+              "Invalid time format. Please provide times in HH:mm:ssZ format.",
+          });
+        }
+
+        const startMoment = moment(startTime, "HH:mm:ssZ");
+        const endMoment = moment(endTime, "HH:mm:ssZ");
+
+        if (startMoment.isSameOrAfter(endMoment)) {
+          await transaction.rollback();
+          return res.status(400).send({
+            success: false,
+            message: "Start time must be before end time.",
           });
         }
       }
+      // Validate name
+      if (otherFields.name) {
+        const nameError = isValidLength(otherFields.name);
+        if (nameError) {
+          return res.status(400).send({ success: false, message: nameError });
+        }
+      }
+      // validate email
+      if (otherFields.email) {
+        if ([otherFields.email].some((field) => field?.trim() === "")) {
+          return res.status(400).send({
+            success: false,
+            message: "Missing email",
+          });
+        }
+        if (!isValidEmail(otherFields.email)) {
+          return res
+            .status(400)
+            .send({ success: false, message: "Invalid email" });
+        }
+      }
+      // validate countryCode
+      if (otherFields.countryCode) {
+        if ([otherFields.countryCode].some((field) => field?.trim() === "")) {
+          return res.status(400).send({
+            success: false,
+            message: "Missing country code",
+          });
+        }
+        const countryCodeError = isValidCountryCode(otherFields.countryCode);
+        if (countryCodeError) {
+          return res
+            .status(400)
+            .send({ success: false, message: countryCodeError });
+        }
+      }
+      // validate phone
+      if (otherFields.phone) {
+        if ([otherFields.phone].some((field) => field?.trim() === "")) {
+          return res.status(400).send({
+            success: false,
+            message: "Missing Phone",
+          });
+        }
+        if (!isValidPhone(otherFields.phone)) {
+          return res
+            .status(400)
+            .send({ success: false, message: "Invalid Phone Number" });
+        }
+      }
 
-      const [updatedRows] = await this.model.update(
+      const [updatedRows] = await models.Agent.update(
         { ...otherFields, startTime, endTime },
         {
           where: { id: id },
@@ -765,7 +891,7 @@ class AgentController extends BaseController {
       );
 
       if (updatedRows > 0) {
-        const updatedItem = await this.model.findByPk(id, {
+        const updatedItem = await models.Agent.findByPk(id, {
           attributes: { exclude: ["password"] },
         });
         res.json({
@@ -849,220 +975,295 @@ class AgentController extends BaseController {
   // agent availability
   getAgentAvailability = async (req, res) => {
     try {
-      const { agentId, date } = req.query;
+      const { jobPostId, agentId, date } = req.query;
 
-      if (!agentId || !date) {
-        return res.status(400).send({
-          success: false,
-          message: "Agent ID and date are required",
-        });
+      // Validate input
+      if (!agentId || !jobPostId || !date) {
+        return res.status(400).json({ error: "Missing required parameters" });
       }
-      // Parse and validate the date
-      const parsedDate = moment(date, ["DD-MM-YYYY", "YYYY-MM-DD"], true);
-      if (!parsedDate.isValid()) {
-        return res.status(400).send({
-          success: false,
-          message: "Invalid date format. Please use DD-MM-YYYY.",
+
+      // Validate date format
+      if (!moment(date, "YYYY-MM-DD", true).isValid()) {
+        return res
+          .status(400)
+          .json({ error: "Invalid date format. Use YYYY-MM-DD" });
+      }
+
+      // Fetch agent and job post
+      const [agent, jobPost] = await Promise.all([
+        models.Agent.findByPk(agentId),
+        models.JobPost.findByPk(jobPostId),
+      ]);
+
+      if (!agent || !jobPost) {
+        return res.status(404).json({ error: "Agent or JobPost not found" });
+      }
+
+      // Check if DailySlot already exists
+      let dailySlot = await models.DailySlot.findOne({
+        where: { agentId, date, JobPostId: jobPostId },
+      });
+
+      if (dailySlot) {
+        return res.json(dailySlot.slots);
+      }
+
+      // Calculate mini slot duration
+      const averageTimePerJobCard = jobPost.averageTime || 6; // default to 6 minutes if not set
+      const miniSlotDuration = Math.max(
+        6,
+        Math.ceil(averageTimePerJobCard / 6) * 6
+      ); // Round up to nearest multiple of 6
+
+      // Parse agent's working hours
+      const startTime = agent.startTime; // e.g., "09:00:00"
+      const endTime = agent.endTime; // e.g., "18:00:00"
+
+      // Combine date with time to create start and end Date objects in UTC
+      const agentStartTime = moment.utc(`${date}T${startTime}`);
+      const agentEndTime = moment.utc(`${date}T${endTime}`);
+
+      // Generate slots
+      const slots = [];
+      let currentSlotStart = agentStartTime.clone();
+
+      while (currentSlotStart.isBefore(agentEndTime)) {
+        const slotEnd = moment.min(
+          currentSlotStart.clone().add(1, "hour"),
+          agentEndTime
+        );
+
+        const miniSlots = [];
+        let currentMiniSlotStart = currentSlotStart.clone();
+
+        while (currentMiniSlotStart.isBefore(slotEnd)) {
+          const miniSlotEnd = moment.min(
+            currentMiniSlotStart.clone().add(miniSlotDuration, "minutes"),
+            slotEnd
+          );
+
+          miniSlots.push({
+            start: currentMiniSlotStart.toISOString(),
+            end: miniSlotEnd.toISOString(),
+          });
+
+          currentMiniSlotStart = miniSlotEnd;
+        }
+
+        slots.push({
+          slot: {
+            start: currentSlotStart.toISOString(),
+            end: slotEnd.toISOString(),
+          },
+          availableMiniSlots: miniSlots,
         });
+
+        currentSlotStart = slotEnd;
+      }
+
+      // Filter out occupied slots
+      const occupiedSlots = agent.jobs.filter(
+        (job) =>
+          moment(job.startTime).isSame(date, "day") ||
+          moment(job.endTime).isSame(date, "day")
+      );
+
+      slots.forEach((slot) => {
+        slot.availableMiniSlots = slot.availableMiniSlots.filter(
+          (miniSlot) =>
+            !occupiedSlots.some(
+              (job) =>
+                moment(job.startTime).isBetween(
+                  miniSlot.start,
+                  miniSlot.end,
+                  null,
+                  "[)"
+                ) ||
+                moment(job.endTime).isBetween(
+                  miniSlot.start,
+                  miniSlot.end,
+                  null,
+                  "(]"
+                )
+            )
+        );
+      });
+
+      // Create new DailySlot
+      dailySlot = await models.DailySlot.create({
+        agentId,
+        JobPostId: jobPostId,
+        date,
+        slots,
+      });
+
+      // Calculate count of available mini slots
+      const availableMiniSlotsCount = slots.reduce(
+        (count, { availableMiniSlots }) => count + availableMiniSlots.length,
+        0
+      );
+
+      // Update the agent's availableSlots field with the count
+      await models.Agent.update(
+        { availableSlots: availableMiniSlotsCount },
+        { where: { id: agentId } }
+      );
+
+      res.json(slots);
+    } catch (error) {
+      console.error("Error in getAgentAvailability:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  };
+
+  assignJobCardToAgent = async (req, res) => {
+    try {
+      const { jobCards, agentId, selectedSlots } = req.body;
+      const { jobPostId } = req.params;
+
+      // Validation checks
+      if (!jobCards || !Array.isArray(jobCards) || jobCards.length === 0) {
+        return res
+          .status(400)
+          .json({ error: "Invalid or empty jobCards array" });
+      }
+      if (!agentId) {
+        return res.status(400).json({ error: "AgentId is required" });
+      }
+      if (
+        !selectedSlots ||
+        !Array.isArray(selectedSlots) ||
+        selectedSlots.length === 0
+      ) {
+        return res
+          .status(400)
+          .json({ error: "Invalid or empty selectedSlots array" });
+      }
+      if (!jobPostId) {
+        return res.status(400).json({ error: "JobPostId is required" });
       }
 
       const agent = await models.Agent.findByPk(agentId);
       if (!agent) {
-        return res.status(404).send({
-          success: false,
-          message: "Agent not found",
-        });
+        return res.status(404).json({ error: "Agent not found" });
       }
 
-      const startOfDay = parsedDate.startOf("day");
-      const endOfDay = parsedDate.endOf("day");
-
-      const assignments = await models.Assignment.findAll({
-        where: {
-          AgentId: agentId,
-          startTime: {
-            [Op.between]: [startOfDay.toDate(), endOfDay.toDate()],
-          },
-        },
-        order: [["startTime", "ASC"]],
-      });
-
-      const availabilitySlots = [];
-      let currentTime = moment(startOfDay).hour(agent.startTime);
-      const dayEndTime = moment(startOfDay).hour(agent.endTime);
-
-      while (currentTime.isBefore(dayEndTime)) {
-        const slotEnd = moment.min(
-          currentTime.clone().add(1, "hour"),
-          dayEndTime
-        );
-
-        const conflictingAssignments = assignments.filter(
-          (assignment) =>
-            moment(assignment.startTime).isBefore(slotEnd.toDate()) &&
-            moment(assignment.endTime).isAfter(currentTime.toDate())
-        );
-
-        if (conflictingAssignments.length === 0) {
-          availabilitySlots.push({
-            startTime: currentTime.toDate(),
-            endTime: slotEnd.toDate(),
-            available: true,
-            duration: slotEnd.diff(currentTime, "minutes"),
-          });
-        } else {
-          // Handle partial availability within the hour
-          let availableStart = currentTime.clone();
-          conflictingAssignments.forEach((assignment) => {
-            if (moment(assignment.startTime).isAfter(availableStart)) {
-              availabilitySlots.push({
-                startTime: availableStart.toDate(),
-                endTime: moment(assignment.startTime).toDate(),
-                available: true,
-                duration: moment(assignment.startTime).diff(
-                  availableStart,
-                  "minutes"
-                ),
-              });
-            }
-            availableStart = moment.max(
-              availableStart,
-              moment(assignment.endTime)
-            );
-          });
-
-          if (availableStart.isBefore(slotEnd)) {
-            availabilitySlots.push({
-              startTime: currentTime.toDate(),
-              endTime: slotEnd.toDate(),
-              available: true,
-              duration: slotEnd.diff(currentTime, "minutes"),
-              selected: false,
-            });
-          }
-        }
-
-        currentTime = slotEnd;
-      }
-
-      res.status(200).send({
-        success: true,
-        data: availabilitySlots,
-      });
-    } catch (error) {
-      res.status(500).send({
-        success: false,
-        message:
-          error.message ||
-          "An error occurred while fetching agent availability.",
-      });
-    }
-  };
-  assignJobCardToAgent = async (req, res) => {
-    try {
-      const { jobCardId, agentId, selectedSlots } = req.body;
-  
-      if (!jobCardId || !agentId || !selectedSlots || !Array.isArray(selectedSlots) || selectedSlots.length === 0) {
-        return res.status(400).json({ error: "JobCard ID, Agent ID, and selected slots are required and selected slots must be an array" });
-      }
-  
-      const jobCard = await models.JobCard.findByPk(jobCardId);
-      const agent = await models.Agent.findByPk(agentId);
-      if (!jobCard || !agent) {
-        return res.status(404).json({ error: "JobCard or Agent not found" });
-      }
-  
-      const jobPost = await models.JobPost.findByPk(jobCard.JobPostId);
+      const jobPost = await models.JobPost.findByPk(jobPostId);
       if (!jobPost) {
         return res.status(404).json({ error: "Associated JobPost not found" });
       }
-  
-      // Sort selected slots by start time
-      const sortedSlots = selectedSlots.sort((a, b) => moment(a.startTime).diff(moment(b.startTime)));
-  
-      // Check if slots are within working hours
-      const workStartTime = moment(sortedSlots[0].startTime).startOf("day").add(agent.startTime, "hours");
-      const workEndTime = moment(sortedSlots[0].startTime).startOf("day").add(agent.endTime, "hours");
-  
-      if (moment(sortedSlots[0].startTime).isBefore(workStartTime) || 
-          moment(sortedSlots[sortedSlots.length - 1].endTime).isAfter(workEndTime)) {
+
+      // Ensure the number of job cards matches the number of selected slots
+      if (jobCards.length !== selectedSlots.length) {
         return res.status(400).json({
-          error: "The assignment is outside of the agent's working hours",
+          error: "Number of job cards must match the number of selected slots",
         });
       }
-  
-      // Merge consecutive or overlapping slots
-      const mergedSlots = [];
-      let currentSlot = sortedSlots[0];
-  
-      for (let i = 1; i < sortedSlots.length; i++) {
-        if (moment(sortedSlots[i].startTime).diff(moment(currentSlot.endTime), 'minutes') <= 5) {
-          // Merge overlapping or adjacent slots
-          currentSlot.endTime = moment.max(moment(currentSlot.endTime), moment(sortedSlots[i].endTime)).toDate();
-        } else {
-          mergedSlots.push(currentSlot);
-          currentSlot = sortedSlots[i];
-        }
+
+      // Fetch all JobCard records at once
+      const jobCardIds = jobCards.map((jc) => jc.id);
+      const jobCardRecords = await models.JobCard.findAll({
+        where: { id: jobCardIds },
+      });
+
+      if (jobCardRecords.length !== jobCards.length) {
+        return res.status(404).json({ error: "Some JobCards were not found" });
       }
-      mergedSlots.push(currentSlot); // Add the last slot
-  
-      // Check for conflicting assignments
-      for (const slot of mergedSlots) {
-        const conflictingAssignments = await models.Assignment.findAll({
-          where: {
-            AgentId: agentId,
-            [Op.or]: [
-              {
-                startTime: { [Op.lt]: moment(slot.endTime).toDate() },
-                endTime: { [Op.gt]: moment(slot.startTime).toDate() },
-              },
-              {
-                startTime: { [Op.between]: [slot.startTime, moment(slot.endTime).toDate()] },
-              },
-              {
-                endTime: { [Op.between]: [slot.startTime, moment(slot.endTime).toDate()] },
-              },
-            ],
-          },
+
+      // Validate slots and check for conflicts
+      const currentJobs = agent.jobs || [];
+      const newJobs = [];
+
+      for (let i = 0; i < jobCards.length; i++) {
+        const jobCard = jobCardRecords.find((jc) => jc.id === jobCards[i].id);
+        const slot = selectedSlots[i];
+        console.log(slot);
+        console.log(jobCard);
+        // Validate slot times
+        if (!slot.startTime || !slot.endTime) {
+          return res
+            .status(400)
+            .json({ error: `Invalid slot times for slot ${i}` });
+        }
+
+        const startTime = new Date(slot.startTime);
+        const endTime = new Date(slot.endTime);
+
+        if (isNaN(startTime) || isNaN(endTime) || startTime >= endTime) {
+          return res
+            .status(400)
+            .json({ error: `Invalid slot times for slot ${i}` });
+        }
+
+        // Check for conflicts with existing jobs
+        const hasConflict = currentJobs.some((job) => {
+          const jobStart = new Date(job.startTime);
+          const jobEnd = new Date(job.endTime);
+          return startTime < jobEnd && endTime > jobStart;
         });
-  
-        if (conflictingAssignments.length > 0) {
-          return res.status(400).json({ error: "There are conflicting assignments for the selected time slots" });
+
+        if (hasConflict) {
+          return res
+            .status(409)
+            .json({ error: `Slot conflict for job card ${jobCard.id}` });
         }
-      }
-  
-      // Create assignments for each merged slot
-      const createdAssignments = [];
-      for (const slot of mergedSlots) {
-        const assignment = await models.Assignment.create({
-          AgentId: agentId,
-          JobCardId: jobCardId,
+
+        // Prepare new job entry
+        newJobs.push({
+          jobCardId: jobCard.id,
+          jobPostId: jobPostId,
           startTime: slot.startTime,
           endTime: slot.endTime,
           status: "Scheduled",
         });
-        createdAssignments.push(assignment);
+
+        // Update JobCard
+        await jobCard.update({
+          status: "Ongoing",
+          lastUpdatedByAgent: agentId,
+          startTime: slot.startTime,
+          endTime: slot.endTime,
+          isAssigned: true,
+        });
       }
-  
-      // Update JobCard status and lastUpdatedByAgent
-      jobCard.status = "Ongoing";
-      jobCard.lastUpdatedByAgent = agentId; // Ensure agentId exists in the correct table
-      await jobCard.save();
-  
-      // Update agent's jobInHand
-      agent.jobInHand += 1;
-      await agent.save();
-  
-      return res.status(200).json({ 
-        message: "Job card assigned successfully", 
-        assignments: createdAssignments 
+
+      // Update agent's jobs and jobInHand
+      const updatedJobs = [...currentJobs, ...newJobs];
+      await agent.update({
+        jobs: updatedJobs,
+        jobInHand: updatedJobs.length,
+      });
+
+      // Update DailySlot to mark selected slots as unavailable
+      // Fetch the current DailySlot
+      const date = new Date(selectedSlots[0].startTime)
+        .toISOString()
+        .split("T")[0];
+      const dailySlot = await models.DailySlot.findOne({
+        where: { agentId, date, JobPostId: jobPostId },
+      });
+
+      if (!dailySlot) {
+        return res.status(404).json({ error: "DailySlot not found" });
+      }
+
+      // Update DailySlot to mark selected slots as unavailable
+      const updatedSlots = updateDailySlotAvailability(
+        dailySlot.slots,
+        selectedSlots
+      );
+      await dailySlot.update({ slots: updatedSlots });
+
+      return res.status(200).json({
+        message: "Job cards assigned successfully",
+        assignedJobs: newJobs,
       });
     } catch (error) {
       console.error("Error in assignJobCardToAgent:", error);
       return res.status(500).json({ error: "Internal server error" });
     }
   };
-  
+
   removeJobCardFromAgent = async (req, res) => {
     try {
       const { jobCardId, agentId } = req.body;

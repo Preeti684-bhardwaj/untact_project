@@ -10,6 +10,7 @@ module.exports = (sequelize, DataTypes) => {
             type: DataTypes.STRING,
             allowNull: false
         },
+        countryCode:DataTypes.TEXT,
         phone: DataTypes.STRING,
         password: {
             type: DataTypes.STRING,
@@ -30,9 +31,11 @@ module.exports = (sequelize, DataTypes) => {
             defaultValue: false
         },
         emailToken: DataTypes.STRING,
-        startTime:DataTypes.INTEGER,
-        endTime:DataTypes.INTEGER,
+        startTime:DataTypes.STRING,
+        endTime:DataTypes.STRING,
+        availableSlots:DataTypes.JSON,
         badgeEarned:DataTypes.INTEGER,
+        jobs: DataTypes.JSON,
         jobInHand:DataTypes.INTEGER,
         isJobCompleted:{ //to count the completed job of a agent
             type:DataTypes.BOOLEAN,
