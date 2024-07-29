@@ -809,10 +809,7 @@ class AgentController extends BaseController {
         });
       }
       if (startTime || endTime) {
-        if (
-          !isValidTimeString(startTime) ||
-          !isValidTimeString(endTime)
-        ) {
+        if (!isValidTimeString(startTime) || !isValidTimeString(endTime)) {
           await transaction.rollback();
           return res.status(400).send({
             success: false,
@@ -1062,31 +1059,48 @@ class AgentController extends BaseController {
       }
 
       // Filter out occupied slots
-      const occupiedSlots = agent.jobs.filter(
-        (job) =>
-          moment(job.startTime).isSame(date, "day") ||
-          moment(job.endTime).isSame(date, "day")
-      );
+      let occupiedSlots = [];
 
-      slots.forEach((slot) => {
-        slot.availableMiniSlots = slot.availableMiniSlots.filter(
-          (miniSlot) =>
-            !occupiedSlots.some(
-              (job) =>
-                moment(job.startTime).isBetween(
-                  miniSlot.start,
-                  miniSlot.end,
-                  null,
-                  "[)"
-                ) ||
-                moment(job.endTime).isBetween(
-                  miniSlot.start,
-                  miniSlot.end,
-                  null,
-                  "(]"
-                )
-            )
+      if (agent.jobs && Array.isArray(agent.jobs)) {
+        occupiedSlots = agent.jobs.filter(
+          (job) =>
+            moment(job.startTime).isSame(date, "day") ||
+            moment(job.endTime).isSame(date, "day")
         );
+      } else if (agent.jobs) {
+        console.warn(`Unexpected format for agent.jobs: ${typeof agent.jobs}`);
+      }
+
+      // If there are no occupied slots, all slots are available
+      if (occupiedSlots.length === 0) {
+        // No need to filter slots, they're all available
+        // You might want to log this for debugging
+        console.log(`No occupied slots for agent ${agentId} on ${date}`);
+      }
+
+      // The rest of your slot filtering logic...
+      slots.forEach((slot) => {
+        if (occupiedSlots.length > 0) {
+          slot.availableMiniSlots = slot.availableMiniSlots.filter(
+            (miniSlot) =>
+              !occupiedSlots.some(
+                (job) =>
+                  moment(job.startTime).isBetween(
+                    miniSlot.start,
+                    miniSlot.end,
+                    null,
+                    "[)"
+                  ) ||
+                  moment(job.endTime).isBetween(
+                    miniSlot.start,
+                    miniSlot.end,
+                    null,
+                    "(]"
+                  )
+              )
+          );
+        }
+        // If occupiedSlots is empty, all miniSlots remain available
       });
 
       // Create new DailySlot
