@@ -810,14 +810,14 @@ class AgentController extends BaseController {
       }
       if (startTime || endTime) {
         if (
-          !isValidGMTTimeString(startTime) ||
-          !isValidGMTTimeString(endTime)
+          !isValidTimeString(startTime) ||
+          !isValidTimeString(endTime)
         ) {
           await transaction.rollback();
           return res.status(400).send({
             success: false,
             message:
-              "Invalid time format. Please provide times in HH:mm:ssZ format.",
+              "Invalid time format. Please provide times in HH:mm:ss format.",
           });
         }
 
