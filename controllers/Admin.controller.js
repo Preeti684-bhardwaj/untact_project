@@ -567,7 +567,7 @@ class AdminController extends BaseController {
   async updateAdmin(req, res) {
     try {
       const id = req.params.id;
-      const { name, email, phone } = req.body;
+      const { name } = req.body;
       // Validate name
       if (name) {
         const nameError = isValidLength(name);
@@ -575,47 +575,16 @@ class AdminController extends BaseController {
           return res.status(400).send({ success: false, message: nameError });
         }
       }
-      if (email) {
-        if (
-          [email].some((field) => field?.trim() === "")
-        ) {
-          return res.status(400).send({
-            success: false,
-            message: "Missing email",
-          });
-        }
-        if (!isValidEmail(email)) {
-          return res
-            .status(400)
-            .send({ success: false, message: "Invalid email" });
-        }
-      }
-      if (phone) {
-        if (
-          [phone].some((field) => field?.trim() === "")
-        ) {
-          return res.status(400).send({
-            success: false,
-            message: "Missing Phone",
-          });
-        }
-        if (!isValidPhone(phone)) {
-          return res
-            .status(400)
-            .send({ success: false, message: "Invalid Phone Number" });
-        }
-      }
+      
       // Prepare the update object
       const updateData = {};
       if (name && name.trim() !== "") updateData.name = name.trim();
-      if (email && email.trim() !== "") updateData.email = email.toLowerCase().trim();
-      if (phone && phone.trim() !== "") updateData.phone = phone.trim();
 
       // Check if any valid field is provided
       if (Object.keys(updateData).length === 0) {
         return res.status(400).send({
           success: false,
-          message: "Please provide at least one valid field to update (name, email, or phone)",
+          message: "Please provide valid field to update(name)",
         });
       }
 
