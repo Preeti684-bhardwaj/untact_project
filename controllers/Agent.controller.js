@@ -798,6 +798,7 @@ class AgentController extends BaseController {
     }
   };
   updateAgentByAdmin = async (req, res) => {
+    const transaction = await sequelize.transaction();
     try {
       const id = req.params.id;
       const { startTime, endTime, ...otherFields } = req.body;
@@ -884,7 +885,7 @@ class AgentController extends BaseController {
         { ...otherFields, startTime, endTime },
         {
           where: { id: id },
-        }
+        },{transaction}
       );
 
       if (updatedRows > 0) {
