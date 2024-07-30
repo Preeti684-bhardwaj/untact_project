@@ -1195,14 +1195,15 @@ class AgentController extends BaseController {
         console.log(slot);
         console.log(jobCard);
         // Validate slot times
-        // if (!slot.start || !slot.end) {
-        //   return res
-        //     .status(400)
-        //     .json({ error: `Invalid slot times for slot ${i}` });
-        // }
+        if (!slot.start || !slot.end) {
+          return res
+            .status(400)
+            .json({ error: `Invalid slot times for slot ${i}` });
+        }
 
-        const startTime = new Date(slot.startTime);
-        const endTime = new Date(slot.endTime);
+        const startTime = new Date(slot.start);
+        const endTime = new Date(slot.end);
+
 
         if (isNaN(startTime) || isNaN(endTime) || startTime >= endTime) {
           return res
