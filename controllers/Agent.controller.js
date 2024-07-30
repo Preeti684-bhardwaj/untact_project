@@ -1252,6 +1252,7 @@ class AgentController extends BaseController {
 
       // Update DailySlot to mark selected slots as unavailable
       // Fetch the current DailySlot
+      console.log(selectedSlots[0].startTime);
       const date = new Date(selectedSlots[0].startTime)
         .toISOString()
         .split("T")[0];
