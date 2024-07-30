@@ -1252,16 +1252,16 @@ class AgentController extends BaseController {
 
       // Update DailySlot to mark selected slots as unavailable
       // Fetch the current DailySlot
-      console.log('Selected slot startTime:', selectedSlots[0].startTime);
-      const date = new Date(selectedSlots[0].startTime)
-        .toISOString()
-        .split("T")[0];
+      // console.log('Selected slot startTime:', selectedSlots[0].startTime);
+      // const date = new Date(selectedSlots[0].startTime)
+      //   .toISOString()
+      //   .split("T")[0];
       const dailySlot = await models.DailySlot.findOne({
-        where: { agentId, date, JobPostId: jobPostId },
+        where: { agentId:agentId },
       });
 
       if (!dailySlot) {
-        return res.status(404).json({ error: "DailySlot not found" });
+        return res.status(404).json({ error: `DailySlot of agent ${agentId} not found` });
       }
 
       // Update DailySlot to mark selected slots as unavailable
