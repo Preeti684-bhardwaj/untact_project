@@ -150,6 +150,9 @@ class AgentController extends BaseController {
             .send({ success: false, message: `${field} is required` });
         }
       }
+      const startTime="09:00:00"
+      const endTime="18:00:00"
+      
       if (!isValidTimeString(startTime) || !isValidTimeString(endTime)) {
         await transaction.rollback();
         return res.status(400).send({
@@ -158,8 +161,7 @@ class AgentController extends BaseController {
             "Invalid time format. Please provide times in HH:mm:ss format.",
         });
       }
-      const startTime="09:00:00"
-      const endTime="18:00:00"
+
       const startMoment = parseTimeString(startTime);
       const endMoment = parseTimeString(endTime);
 
