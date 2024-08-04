@@ -152,7 +152,7 @@ class AgentController extends BaseController {
       }
       const startTime="09:00:00"
       const endTime="18:00:00"
-      
+
       if (!isValidTimeString(startTime) || !isValidTimeString(endTime)) {
         await transaction.rollback();
         return res.status(400).send({
@@ -244,7 +244,6 @@ class AgentController extends BaseController {
           phone,
           password: hashedPassword,
           emailToken,
-          isEmailVerified: true,
           startTime,
           endTime
         },
