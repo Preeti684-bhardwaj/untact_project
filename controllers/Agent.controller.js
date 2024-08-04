@@ -104,7 +104,7 @@ class AgentController extends BaseController {
   signupByAgent = async (req, res) => {
     const transaction = await sequelize.transaction();
     try {
-      const { name, email, countryCode, phone, password, startTime, endTime } =
+      const { name, email, countryCode, phone, password } =
         req.body;
 
       // mandatory field check
@@ -133,22 +133,14 @@ class AgentController extends BaseController {
           .status(400)
           .send({ success: false, message: "Password is required" });
       }
-      if (!startTime || !endTime) {
-        return res.status(400).send({
-          success: false,
-          message: "Start time and end time are required",
-        });
-      }
-
+  
       // Validate required fields
       const requiredFields = {
         name,
         email,
         countryCode,
         phone,
-        password,
-        startTime,
-        endTime,
+        password
       };
       for (const [field, value] of Object.entries(requiredFields)) {
         if (!value) {
@@ -250,8 +242,8 @@ class AgentController extends BaseController {
           password: hashedPassword,
           emailToken,
           isEmailVerified: true,
-          startTime,
-          endTime,
+          startTime:"09:00:00",
+          endTime:"18:00:00",
         },
         { transaction }
       );
