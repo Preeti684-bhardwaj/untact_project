@@ -158,7 +158,8 @@ class AgentController extends BaseController {
             "Invalid time format. Please provide times in HH:mm:ss format.",
         });
       }
-
+      const startTime="09:00:00"
+      const endTime="18:00:00"
       const startMoment = parseTimeString(startTime);
       const endMoment = parseTimeString(endTime);
 
@@ -242,8 +243,8 @@ class AgentController extends BaseController {
           password: hashedPassword,
           emailToken,
           isEmailVerified: true,
-          startTime:"09:00:00",
-          endTime:"18:00:00",
+          startTime,
+          endTime
         },
         { transaction }
       );
