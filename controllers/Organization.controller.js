@@ -379,7 +379,7 @@ class OrganizationController extends BaseController {
       // if (countryCodeError) {
       //   return res.status(400).send({ success: false, message: countryCodeError });
       // }
-      const phoneError = isPhoneValid(trimmedPhone);
+      const phoneError = isPhoneValid(phone);
       if (phoneError) {
         return res.status(400).send({ success: false, message: phoneError });
       }
