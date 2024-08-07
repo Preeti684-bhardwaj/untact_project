@@ -5,6 +5,7 @@ const models = require("../models");
 const {
   isValidEmail,
   isValidPassword,
+  isPhoneValid,
   isValidLength,
 } = require("../utils/validation");
 const { Op } = require("sequelize");
@@ -107,11 +108,11 @@ class AdminController extends BaseController {
       // if (countryCodeError) {
       //   return res.status(400).send({ success: false, message: countryCodeError });
       // }
-      // if (!isValidPhone(phone)) {
-      //   return res
-      //     .status(400)
-      //     .send({ success: false, message: "Invalid Phone Number" });
-      // }
+      const phoneError = isPhoneValid(phone);
+      if (phoneError) {
+        return res.status(400).send({ success: false, message: phoneError });
+      }
+
       const existingAdmin = await models.Admin.findOne(
         {
           where: {
@@ -273,67 +274,69 @@ class AdminController extends BaseController {
     try {
       const id = req.params.id;
       const { name } = req.body;
-  
+
       // Validate and sanitize the name
-      if (name && typeof name === 'string' && name.trim() !== '') {
+      if (name && typeof name === "string" && name.trim() !== "") {
         const trimmedName = name.trim();
-  
+
         // Check if the trimmed name is still non-empty
-        if (trimmedName === '') {
+        if (trimmedName === "") {
           return res.status(400).json({
             success: false,
-            error: 'Name cannot be empty or whitespace.',
+            error: "Name cannot be empty or whitespace.",
           });
         }
-  
+
         // Prepare the update object
         const updateData = { name: trimmedName };
-  
+
         // Validate name length (assuming `isValidLength` is a custom function)
         const nameError = isValidLength(trimmedName);
         if (nameError) {
           return res.status(400).json({ success: false, message: nameError });
         }
-  
+
         // Update the admin
         const [updatedRowsCount] = await models.Admin.update(updateData, {
           where: { id: id },
         });
-  
+
         if (updatedRowsCount > 0) {
           const updatedItem = await models.Admin.findByPk(id, {
-            attributes: { exclude: ['password'] },
+            attributes: { exclude: ["password"] },
           });
-  
+
           if (updatedItem) {
             return res.json({
               success: true,
-              message: 'Admin updated successfully',
+              message: "Admin updated successfully",
               data: updatedItem,
             });
           } else {
-            return res.status(404).json({ success: false, error: 'Admin not found after update' });
+            return res
+              .status(404)
+              .json({ success: false, error: "Admin not found after update" });
           }
         } else {
           return res.status(404).json({
             success: false,
-            error: 'Admin not found or couldn\'t be updated',
+            error: "Admin not found or couldn't be updated",
           });
         }
       } else {
         return res.status(400).json({
           success: false,
-          error: 'Name is a required field and cannot be empty or whitespace.',
+          error: "Name is a required field and cannot be empty or whitespace.",
         });
       }
     } catch (error) {
-      console.error('Update error:', error);
+      console.error("Update error:", error);
       return res.status(500).json({
         success: false,
-        error: 'An error occurred while updating the admin',
+        error: "An error occurred while updating the admin",
       });
     }
-  }  
+  }
 }
 
 module.exports = new AdminController();

@@ -154,11 +154,10 @@ class AgentController extends BaseController {
       //     .status(400)
       //     .send({ success: false, message: countryCodeError });
       // }
-      // if (!isValidPhone(phone)) {
-      //   return res
-      //     .status(400)
-      //     .send({ success: false, message: "Invalid Phone Number" });
-      // }
+      const phoneError = isPhoneValid(phone);
+      if (phoneError) {
+        return res.status(400).send({ success: false, message: phoneError });
+      }
 
       if (!isValidEmail(email)) {
         return res
@@ -318,11 +317,10 @@ class AgentController extends BaseController {
       //     .status(400)
       //     .send({ success: false, message: countryCodeError });
       // }
-      // if (!isValidPhone(phone)) {
-      //   return res
-      //     .status(400)
-      //     .send({ success: false, message: "Invalid Phone Number" });
-      // }
+      const phoneError = isPhoneValid(phone);
+      if (phoneError) {
+        return res.status(400).send({ success: false, message: phoneError });
+      }
 
       if (!isValidEmail(email)) {
         return res
@@ -489,7 +487,7 @@ class AgentController extends BaseController {
     try {
       const id = req.params.id;
       const { startTime, endTime, name, email, phone } = req.body;
-  
+
       // Validate that no password is included in the request body
       if ("password" in req.body) {
         await transaction.rollback();
@@ -498,10 +496,10 @@ class AgentController extends BaseController {
           error: "Password cannot be updated by Admin",
         });
       }
-  
+
       // Initialize updateData object
       const updateData = {};
-  
+
       // Validate and sanitize startTime and endTime
       if (startTime !== undefined || endTime !== undefined) {
         if (startTime !== undefined) {
@@ -517,12 +515,13 @@ class AgentController extends BaseController {
             await transaction.rollback();
             return res.status(400).send({
               success: false,
-              message: "Invalid start time format. Please provide time in HH:mm:ss format.",
+              message:
+                "Invalid start time format. Please provide time in HH:mm:ss format.",
             });
           }
           updateData.startTime = trimmedStartTime;
         }
-  
+
         if (endTime !== undefined) {
           const trimmedEndTime = endTime.trim();
           if (trimmedEndTime === "") {
@@ -536,13 +535,19 @@ class AgentController extends BaseController {
             await transaction.rollback();
             return res.status(400).send({
               success: false,
-              message: "Invalid end time format. Please provide time in HH:mm:ss format.",
+              message:
+                "Invalid end time format. Please provide time in HH:mm:ss format.",
             });
           }
           updateData.endTime = trimmedEndTime;
-  
+
           // Ensure startTime is before endTime
-          if (updateData.startTime && moment(updateData.startTime, "HH:mm:ss").isSameOrAfter(moment(updateData.endTime, "HH:mm:ss"))) {
+          if (
+            updateData.startTime &&
+            moment(updateData.startTime, "HH:mm:ss").isSameOrAfter(
+              moment(updateData.endTime, "HH:mm:ss")
+            )
+          ) {
             await transaction.rollback();
             return res.status(400).send({
               success: false,
@@ -551,7 +556,7 @@ class AgentController extends BaseController {
           }
         }
       }
-  
+
       // Validate and sanitize name
       if (name !== undefined) {
         const trimmedName = name.trim();
@@ -569,7 +574,7 @@ class AgentController extends BaseController {
         }
         updateData.name = trimmedName;
       }
-  
+
       // Validate and sanitize email
       if (email !== undefined) {
         const trimmedEmail = email.trim();
@@ -582,11 +587,15 @@ class AgentController extends BaseController {
         }
         if (!isValidEmail(trimmedEmail)) {
           await transaction.rollback();
-          return res.status(400).send({ success: false, message: "Invalid email" });
+          return res
+            .status(400)
+            .send({ success: false, message: "Invalid email" });
         }
-  
+
         // Check if the email already exists in the database
-        const emailExists = await models.Agent.findOne({ where: { email: trimmedEmail, id: { [Op.ne]: id } } });
+        const emailExists = await models.Agent.findOne({
+          where: { email: trimmedEmail, id: { [Op.ne]: id } },
+        });
         if (emailExists) {
           await transaction.rollback();
           return res.status(400).send({
@@ -594,10 +603,10 @@ class AgentController extends BaseController {
             message: "Email already exists",
           });
         }
-  
+
         updateData.email = trimmedEmail;
       }
-  
+
       // Validate and sanitize phone
       if (phone !== undefined) {
         const trimmedPhone = phone.trim();
@@ -608,9 +617,16 @@ class AgentController extends BaseController {
             message: "Phone number cannot be empty or whitespace.",
           });
         }
+        const phoneError = isPhoneValid(trimmedPhone);
+        if (phoneError) {
+          return res.status(400).send({ success: false, message: phoneError });
+        }
   
+
         // Check if the phone number already exists in the database
-        const phoneExists = await models.Agent.findOne({ where: { phone: trimmedPhone, id: { [Op.ne]: id } } });
+        const phoneExists = await models.Agent.findOne({
+          where: { phone: trimmedPhone, id: { [Op.ne]: id } },
+        });
         if (phoneExists) {
           await transaction.rollback();
           return res.status(400).send({
@@ -618,21 +634,26 @@ class AgentController extends BaseController {
             message: "Phone number already exists",
           });
         }
-  
+
         updateData.phone = trimmedPhone;
       }
-  
+
       // Perform the update operation only if there are fields to update
       if (Object.keys(updateData).length === 0) {
         await transaction.rollback();
-        return res.status(400).json({ success: false, error: "No valid fields provided for update." });
+        return res
+          .status(400)
+          .json({
+            success: false,
+            error: "No valid fields provided for update.",
+          });
       }
-  
+
       const [updatedRows] = await models.Agent.update(updateData, {
         where: { id: id },
         transaction,
       });
-  
+
       if (updatedRows > 0) {
         await transaction.commit();
         const updatedItem = await models.Agent.findByPk(id, {
@@ -645,13 +666,15 @@ class AgentController extends BaseController {
         });
       } else {
         await transaction.rollback();
-        return res.status(404).json({ success: false, error: "Agent not found" });
+        return res
+          .status(404)
+          .json({ success: false, error: "Agent not found" });
       }
     } catch (error) {
       await transaction.rollback();
       return res.status(500).json({ success: false, error: error.message });
     }
-  };    
+  };
   // update By Agent
   updateByAgent = async (req, res) => {
     try {

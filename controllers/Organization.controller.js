@@ -184,15 +184,9 @@ class OrganizationController extends BaseController {
       // if (countryCodeError) {
       //   return res.status(400).send({ success: false, message: countryCodeError });
       // }
-      // if (!isValidPhone(phone)) {
-      //   return res
-      //     .status(400)
-      //     .send({ success: false, message: "Invalid Phone Number" });
-      // }
-      if (!isValidEmail(email)) {
-        return res
-          .status(400)
-          .send({ success: false, message: "Invalid email" });
+      const phoneError = isPhoneValid(phone);
+      if (phoneError) {
+        return res.status(400).send({ success: false, message: phoneError });
       }
       const existingOrganization = await models.Organization.findOne(
         {
@@ -384,11 +378,10 @@ class OrganizationController extends BaseController {
       // if (countryCodeError) {
       //   return res.status(400).send({ success: false, message: countryCodeError });
       // }
-      // if (!isValidPhone(phone)) {
-      //   return res
-      //     .status(400)
-      //     .send({ success: false, message: "Invalid Phone Number" });
-      // }
+      const phoneError = isPhoneValid(trimmedPhone);
+      if (phoneError) {
+        return res.status(400).send({ success: false, message: phoneError });
+      }
       if (!isValidEmail(email)) {
         return res
           .status(400)
@@ -565,7 +558,7 @@ class OrganizationController extends BaseController {
   updateByAdmin = async (req, res) => {
     try {
       const id = req.params.id;
-      const { name, email, type, description, location } = req.body;
+      const { name,phone, email, type, description, location } = req.body;
   
       // Check for password field
       if ("password" in req.body) {
@@ -588,6 +581,35 @@ class OrganizationController extends BaseController {
         if (!isValidEmail(email)) {
           return res.status(400).send({ success: false, message: "Invalid email" });
         }
+        // Check if the email already exists in the database
+        const emailExists = await models.Agent.findOne({
+          where: { email: email, id: { [Op.ne]: id } },
+        });
+        if (emailExists) {
+          await transaction.rollback();
+          return res.status(400).send({
+            success: false,
+            message: "Email already exists",
+          });
+        }
+      }
+      // validate phone
+      if (phone !== undefined) {
+        const phoneError = isPhoneValid(phone);
+        if (phoneError) {
+          return res.status(400).send({ success: false, message: phoneError });
+        }
+          // Check if the phone number already exists in the database
+          const phoneExists = await models.Organization.findOne({
+            where: { phone: phone, id: { [Op.ne]: id } },
+          });
+          if (phoneExists) {
+            await transaction.rollback();
+            return res.status(400).send({
+              success: false,
+              message: "Phone number already exists",
+            });
+          }
       }
   
       // Validate type

@@ -103,7 +103,24 @@ const isValidLocation = (location) => {
   return null;  // No errors
 };
 
-
+const isPhoneValid = (phone) => {
+  if (!phone) {
+    return "Phone number is required";
+  }
+  // Check if phone number contains only digits, hyphens, spaces, and the plus sign
+  if (!/^[\d\s+-]+$/.test(phone)) {
+    return "Phone number should only contain digits, spaces, hyphens, and the plus sign";
+  }
+  // Check if phone number does not start with a space
+  if (/^[\s]/.test(phone)) {
+    return "Phone number should not start with a space";
+  }
+  // Check if phone number does not contain consecutive spaces
+  if (/\s{2,}/.test(phone)) {
+    return "Phone number should not contain consecutive spaces";
+  }
+  return null;  // No errors
+};
 // const isValidCountryCode = (countryCode) => {
 //   // List of valid country codes (this is a sample, not exhaustive)
 //   // const validCodes = ['+1', '+44', '+91', '+86', '+81', '+49', '+33', '+7', '+61', '+55'];
@@ -177,7 +194,7 @@ module.exports = {
   isValidEmail,
   isValidDescription,
   isValidLocation,
-  // isValidPhone,
+  isPhoneValid,
   // isValidCountryCode,
   isValidTimeString,
   parseTimeString,
