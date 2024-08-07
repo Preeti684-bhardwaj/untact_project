@@ -735,53 +735,47 @@ class BaseController {
   // filter oraganization
   async filterOrganization(req, res) {
     try {
-      const { page = 1, limit } = req.query;
-      const { due_date, name, status } = req.query;
+      const { page = 1, limit, due_date, name, status } = req.query;
   
       // Validate page and limit
       const pageValue = parseInt(page, 10);
       const limitValue = parseInt(limit, 10);
   
       if (isNaN(pageValue) || pageValue <= 0) {
-        return res
-          .status(400)
-          .json({ success: false, error: "Invalid page number" });
+        return res.status(400).json({ success: false, error: "Invalid page number" });
       }
       if (isNaN(limitValue) || limitValue <= 0) {
-        return res
-          .status(400)
-          .json({ success: false, error: "Invalid limit number" });
+        return res.status(400).json({ success: false, error: "Invalid limit number" });
       }
   
       const offset = (pageValue - 1) * limitValue;
   
       let order = [];
       let whereClause = {};
+      let includeWhereClause = {};
   
-      // Validate due_date
+      // Validate and add filters for due_date in jobPosts
       if (due_date) {
         if (isNaN(Date.parse(due_date))) {
-          return res
-            .status(400)
-            .json({ success: false, error: "Invalid due date format" });
+          return res.status(400).json({ success: false, error: "Invalid due date format" });
         }
-        // Add sorting for due_date in JobPost
-        order.push([{ model: models.JobPost, as: "jobPosts" }, "due_date", "DESC"]);
+        includeWhereClause[sequelize.where(sequelize.fn('DATE', sequelize.col('due_date')), due_date)] = due_date;
+        order.push([sequelize.literal(`CASE WHEN DATE("jobPosts"."due_date") = '${due_date}' THEN 0 ELSE 1 END`), "ASC"]);
       }
   
-      // Validate name
+      // Validate and add filters for status in jobPosts
+      if (status) {
+        includeWhereClause.status = status;
+        order.push([sequelize.literal(`CASE WHEN "jobPosts"."status" = '${status}' THEN 0 ELSE 1 END`), "ASC"]);
+      }
+  
+      // Validate and add filters for name
       if (name) {
         if (typeof name !== "string" || name.trim() === "") {
-          return res
-            .status(400)
-            .json({ success: false, error: "Invalid name format" });
+          return res.status(400).json({ success: false, error: "Invalid name format" });
         }
-        order.push(["name", "DESC"]);
-      }
-  
-      // Validate status
-      if (status) {
-        order.push([{ model: models.JobPost, as: "jobPosts" }, "status", "DESC"]);
+        whereClause.name = name.trim();
+        order.push([sequelize.literal(`CASE WHEN "Organization"."name" = '${name.trim()}' THEN 0 ELSE 1 END`), "ASC"]);
       }
   
       // Add default ordering
@@ -789,6 +783,7 @@ class BaseController {
   
       // Define query options
       const queryOptions = {
+        where: whereClause,
         order: order,
         attributes: { exclude: ["password"] },
         limit: limitValue,
@@ -796,7 +791,9 @@ class BaseController {
         include: [
           {
             model: models.JobPost,
-            as: "jobPosts", // Use the correct association alias
+            as: "jobPosts",
+            where: includeWhereClause,
+            required: false, // This will ensure organizations without matching job posts are also included
           },
         ],
       };
@@ -815,12 +812,21 @@ class BaseController {
       // Filter and sort the results
       const filteredAndSortedResults = results.rows.sort((a, b) => {
         const aMatch =
-          (!due_date || a.jobPosts.some(job => job.due_date === due_date)) && (!name || a.name === name) && (!status || a.jobPosts.some(job => job.status === status));
+          (!due_date || a.jobPosts.some(job => new Date(job.due_date).toISOString().split('T')[0] === due_date)) &&
+          (!status || a.jobPosts.some(job => job.status === status));
         const bMatch =
-          (!due_date || b.jobPosts.some(job => job.due_date === due_date)) && (!name || b.name === name) && (!status || b.jobPosts.some(job => job.status === status));
+          (!due_date || b.jobPosts.some(job => new Date(job.due_date).toISOString().split('T')[0] === due_date)) &&
+          (!status || b.jobPosts.some(job => job.status === status));
+  
+        const aNameMatch = !name || a.name === name;
+        const bNameMatch = !name || b.name === name;
   
         if (aMatch && !bMatch) return -1;
         if (!aMatch && bMatch) return 1;
+  
+        if (aNameMatch && !bNameMatch) return -1;
+        if (!aNameMatch && bNameMatch) return 1;
+  
         return 0;
       });
   
@@ -844,8 +850,8 @@ class BaseController {
         error: `Internal server error: ${error.message}`,
       });
     }
-  }
-  
+  }  
+
   // delete function
   async delete(req, res) {
     try {
