@@ -850,8 +850,8 @@ class BaseController {
         error: `Internal server error: ${error.message}`,
       });
     }
-  }  
-
+  }
+  
   // delete function
   async delete(req, res) {
     try {
