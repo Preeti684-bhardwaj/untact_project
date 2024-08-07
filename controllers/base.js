@@ -777,7 +777,7 @@ class BaseController {
           query.include[0].where = {};
   
           if (priority) {
-            query.include[0].where.status = priority;
+            query.include[0].where.priority = priority;
           }
   
           if (due_date) {
