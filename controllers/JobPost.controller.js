@@ -97,69 +97,126 @@ class JobPostController extends BaseController {
       res.status(400).json({ error: error.message });
     }
   }
-  async getAllJobPostByOrganizationId(req, res) {
+  async filterOrganization(req, res) {
     try {
-      const organizationId = req.params.organizationId;
-      if (!organizationId) {
-        return res.status(400).json({ message: "Organization ID is required" });
+      const { page = 1, limit, due_date, name, status } = req.query;
+  
+      // Validate page and limit
+      const pageValue = parseInt(page, 10);
+      const limitValue = parseInt(limit, 10);
+  
+      if (isNaN(pageValue) || pageValue <= 0) {
+        return res.status(400).json({ success: false, error: "Invalid page number" });
+      }
+      if (isNaN(limitValue) || limitValue <= 0) {
+        return res.status(400).json({ success: false, error: "Invalid limit number" });
       }
   
-      const { due_date, status, priority } = req.query;
-      const page = parseInt(req.query.page, 10) || 1;
-      const limit = parseInt(req.query.limit, 10) || 10;
-      const offset = (page - 1) * limit;
+      const offset = (pageValue - 1) * limitValue;
   
-      let whereClause = { OrganizationId: organizationId };
       let order = [];
+      let whereClause = {};
+      let includeWhereClause = {};
   
-      // Build dynamic order based on filter criteria
-      if (due_date) order.push(['due_date', 'DESC']);
-      if (status) order.push(['status', 'DESC']);
-      if (priority) order.push(['priority', 'DESC']);
+      // Validate and add filters for due_date in jobPosts
+      if (due_date) {
+        if (isNaN(Date.parse(due_date))) {
+          return res.status(400).json({ success: false, error: "Invalid due date format" });
+        }
+        includeWhereClause[sequelize.where(sequelize.fn('DATE', sequelize.col('due_date')), due_date)] = due_date;
+        order.push([sequelize.literal(`CASE WHEN DATE("jobPosts"."due_date") = '${due_date}' THEN 0 ELSE 1 END`), "ASC"]);
+      }
+  
+      // Validate and add filters for status in jobPosts
+      if (status) {
+        includeWhereClause.status = status;
+        order.push([sequelize.literal(`CASE WHEN "jobPosts"."status" = '${status}' THEN 0 ELSE 1 END`), "ASC"]);
+      }
+  
+      // Validate and add filters for name
+      if (name) {
+        if (typeof name !== "string" || name.trim() === "") {
+          return res.status(400).json({ success: false, error: "Invalid name format" });
+        }
+        whereClause.name = name.trim();
+        order.push([sequelize.literal(`CASE WHEN "Organization"."name" = '${name.trim()}' THEN 0 ELSE 1 END`), "ASC"]);
+      }
   
       // Add default ordering
       order.push(["createdAt", "DESC"]);
   
-      const jobPosts = await models.JobPost.findAndCountAll({
+      // Define query options
+      const queryOptions = {
         where: whereClause,
         order: order,
         attributes: { exclude: ["password"] },
-      });
+        limit: limitValue,
+        offset: offset,
+        include: [
+          {
+            model: models.JobPost,
+            as: "jobPosts",
+            where: includeWhereClause,
+            required: false, // This will ensure organizations without matching job posts are also included
+          },
+        ],
+      };
   
-      if (!jobPosts.rows.length) {
-        return res.status(404).json({success: false, message: "No Job Posts found" });
+      // Fetch the filtered results
+      const results = await models.Organization.findAndCountAll(queryOptions);
+  
+      // Check if results are empty
+      if (!results.rows.length) {
+        return res.status(404).json({
+          success: false,
+          message: "No matching organizations found",
+        });
       }
   
-     // Filter and sort the results
-     const filteredAndSortedPosts = jobPosts.rows.sort((a, b) => {
-      const aMatch = (!due_date || a.due_date === due_date) &&
-                     (!status || a.status === status) &&
-                     (!priority || a.priority === priority);
-      const bMatch = (!due_date || b.due_date === due_date) &&
-                     (!status || b.status === status) &&
-                     (!priority || b.priority === priority);
-
-      if (aMatch && !bMatch) return -1;
-      if (!aMatch && bMatch) return 1;
-      return 0;
-    });
+      // Filter and sort the results
+      const filteredAndSortedResults = results.rows.sort((a, b) => {
+        const aMatch =
+          (!due_date || a.jobPosts.some(job => new Date(job.due_date).toISOString().split('T')[0] === due_date)) &&
+          (!status || a.jobPosts.some(job => job.status === status));
+        const bMatch =
+          (!due_date || b.jobPosts.some(job => new Date(job.due_date).toISOString().split('T')[0] === due_date)) &&
+          (!status || b.jobPosts.some(job => job.status === status));
+  
+        const aNameMatch = !name || a.name === name;
+        const bNameMatch = !name || b.name === name;
+  
+        if (aMatch && !bMatch) return -1;
+        if (!aMatch && bMatch) return 1;
+  
+        if (aNameMatch && !bNameMatch) return -1;
+        if (!aNameMatch && bNameMatch) return 1;
+  
+        return 0;
+      });
   
       // Apply pagination to the sorted results
-      const paginatedPosts = filteredAndSortedPosts.slice(offset, offset + limit);
+      const paginatedResults = filteredAndSortedResults.slice(
+        offset,
+        offset + limitValue
+      );
   
-      res.json({
-        success:true,
-        data: paginatedPosts,
-        total: jobPosts.count,
-        totalPages: Math.ceil(jobPosts.count / limit),
-        currentPage: page,
+      res.status(200).json({
+        success: true,
+        data: paginatedResults,
+        total: results.count,
+        totalPages: Math.ceil(results.count / limitValue),
+        currentPage: pageValue,
       });
     } catch (error) {
-      console.error("Error in getAllJobPostByOrganizationId:", error);
-      res.status(500).json({ error: error.message });
+      console.error("Error in filterOrganization:", error);
+      res.status(500).json({
+        success: false,
+        error: `Internal server error: ${error.message}`,
+      });
     }
   }
   
+//========= delete  JobPost  
   deleteJobPost = async (req, res) => {
     let transaction;
     try {
