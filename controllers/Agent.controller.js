@@ -584,6 +584,17 @@ class AgentController extends BaseController {
           await transaction.rollback();
           return res.status(400).send({ success: false, message: "Invalid email" });
         }
+  
+        // Check if the email already exists in the database
+        const emailExists = await models.Agent.findOne({ where: { email: trimmedEmail, id: { [Op.ne]: id } } });
+        if (emailExists) {
+          await transaction.rollback();
+          return res.status(400).send({
+            success: false,
+            message: "Email already exists",
+          });
+        }
+  
         updateData.email = trimmedEmail;
       }
   
@@ -597,6 +608,17 @@ class AgentController extends BaseController {
             message: "Phone number cannot be empty or whitespace.",
           });
         }
+  
+        // Check if the phone number already exists in the database
+        const phoneExists = await models.Agent.findOne({ where: { phone: trimmedPhone, id: { [Op.ne]: id } } });
+        if (phoneExists) {
+          await transaction.rollback();
+          return res.status(400).send({
+            success: false,
+            message: "Phone number already exists",
+          });
+        }
+  
         updateData.phone = trimmedPhone;
       }
   
@@ -629,7 +651,7 @@ class AgentController extends BaseController {
       await transaction.rollback();
       return res.status(500).json({ success: false, error: error.message });
     }
-  };  
+  };    
   // update By Agent
   updateByAgent = async (req, res) => {
     try {
