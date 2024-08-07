@@ -806,7 +806,7 @@ class BaseController {
           message: "No matching organizations found",
         });
       }
-      return console.log(results.rows[0],results.rows[0].jobPosts);
+      return console.log(results.rows[0],results.rows[0].jobPosts.jobPost);
 
       // Filter and sort the results
       const filteredAndSortedResults = results.rows.sort((a, b) => {
