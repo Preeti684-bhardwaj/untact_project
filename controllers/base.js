@@ -750,7 +750,7 @@ class BaseController {
       // Base query
       let query = {
         include: [{
-          model: JobPost,
+          model: models.JobPost,
           as: 'jobPosts',
           required: false, // Use left outer join
         }],
