@@ -87,7 +87,6 @@ const isValidDescription = (description) => {
   }
   return null;  // No errors
 };
-
 const isValidLocation = (location) => {
   if (!location) {
     return "Location is required";
@@ -95,14 +94,15 @@ const isValidLocation = (location) => {
   if (/^[\s]/.test(location)) {
     return "Location should not start with a space";
   }
-  if (/[^a-zA-Z\s]/.test(location)) {
-    return "Location should only contain letters and spaces";
+  if (/[^a-zA-Z\s,.-]/.test(location)) {
+    return "Location should only contain letters, spaces, commas, hyphens, and full stops";
   }
   if (/\s{2,}/.test(location)) {
     return "Location should not contain consecutive spaces";
   }
   return null;  // No errors
 };
+
 
 // const isValidCountryCode = (countryCode) => {
 //   // List of valid country codes (this is a sample, not exhaustive)
