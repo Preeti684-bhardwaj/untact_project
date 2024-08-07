@@ -4,12 +4,11 @@ const BaseController = require("./base");
 const models = require("../models");
 const {
   isValidEmail,
-  isValidCountryCode,
-  isValidPhone,
+  isValidLocation,
+  isValidDescription,
   isValidPassword,
   isValidLength,
 } = require("../utils/validation");
-const sendEmail = require("../utils/sendEmail.js");
 const { Op } = require("sequelize");
 const sequelize = require("../config/db.config").sequelize; // Ensure this path is correct
 const { authenticate, authorizeAdmin } = require("../controllers/auth");
@@ -18,22 +17,6 @@ const generateToken = (organization) => {
   return jwt.sign({ obj: organization }, process.env.JWT_SECRET, {
     expiresIn: "72h", // expires in 72 hours
   });
-};
-const generateOtp = () => {
-  // Define the possible characters for the OTP
-  const chars = "0123456789";
-  // Define the length of the OTP
-  const len = 6;
-  let otp = "";
-  // Generate the OTP
-  for (let i = 0; i < len; i++) {
-    otp += chars[Math.floor(Math.random() * chars.length)];
-  }
-
-  this.otp = otp;
-  this.otpExpire = Date.now() + 15 * 60 * 1000;
-
-  return otp;
 };
 
 class OrganizationController extends BaseController {
@@ -51,20 +34,16 @@ class OrganizationController extends BaseController {
     );
     this.router.post("/signin", this.signin.bind(this));
     this.router.get("/verify-email", this.verifyEmail.bind(this));
-    this.router.post("/forgotPassword", this.forgotPassword.bind(this));
-    this.router.post(
-      "/resetpassword/:organizationId",
-      this.resetPassword.bind(this)
-    );
-    this.router.post("/sendOtp", this.sendOtp.bind(this));
-    this.router.post("/otpVerification", this.emailOtpVerification.bind(this));
     this.router.put(
       "/updateByAdmin/:id",
       authenticate,
       authorizeAdmin,
       this.updateByAdmin.bind(this)
     );
-    this.router.put("/updateByOrganization/:id", this.updateByOrganization.bind(this));
+    this.router.put(
+      "/updateByOrganization/:id",
+      this.updateByOrganization.bind(this)
+    );
   }
 
   listArgVerify(req, res, queryOptions) {
@@ -92,6 +71,7 @@ class OrganizationController extends BaseController {
   async afterCreate(req, res, newObject, transaction) {
     // Add additional setup after creating an organization, if necessary
   }
+  // signUp By Organization
   signupByOrganization = async (req, res) => {
     const transaction = await sequelize.transaction();
     try {
@@ -101,7 +81,6 @@ class OrganizationController extends BaseController {
         description,
         contact_person_name,
         email,
-        countryCode,
         phone,
         password,
         location,
@@ -132,11 +111,11 @@ class OrganizationController extends BaseController {
           .status(400)
           .send({ success: false, message: "Email is required" });
       }
-      if (!countryCode) {
-        return res
-          .status(400)
-          .send({ success: false, message: "Country Code is required" });
-      }
+      // if (!countryCode) {
+      //   return res
+      //     .status(400)
+      //     .send({ success: false, message: "Country Code is required" });
+      // }
       if (!phone) {
         return res
           .status(400)
@@ -158,9 +137,9 @@ class OrganizationController extends BaseController {
         [
           name,
           type,
+          description,
           contact_person_name,
           email,
-          countryCode,
           phone,
           password,
           location,
@@ -177,6 +156,18 @@ class OrganizationController extends BaseController {
       if (nameError) {
         return res.status(400).send({ success: false, message: nameError });
       }
+      // validate type
+      const typeError = isValidLength(type);
+      if (typeError) {
+        return res.status(400).send({ success: false, message: typeError });
+      }
+      // validate description
+      const descriptionError = isValidDescription(description);
+      if (descriptionError) {
+        return res
+          .status(400)
+          .send({ success: false, message: descriptionError });
+      }
       // validate contact person name
       const contactPersonNameError = isValidLength(contact_person_name);
       if (contactPersonNameError) {
@@ -184,91 +175,29 @@ class OrganizationController extends BaseController {
           .status(400)
           .send({ success: false, message: contactPersonNameError });
       }
-      const countryCodeError = isValidCountryCode(countryCode);
-      if (countryCodeError) {
-        return res.status(400).send({ success: false, message: countryCodeError });
+      // validate location
+      const locationError = isValidLocation(location);
+      if (locationError) {
+        return res.status(400).send({ success: false, message: locationError });
       }
-      if (!isValidPhone(phone)) {
-        return res
-          .status(400)
-          .send({ success: false, message: "Invalid Phone Number" });
-      }
-
+      // const countryCodeError = isValidCountryCode(countryCode);
+      // if (countryCodeError) {
+      //   return res.status(400).send({ success: false, message: countryCodeError });
+      // }
+      // if (!isValidPhone(phone)) {
+      //   return res
+      //     .status(400)
+      //     .send({ success: false, message: "Invalid Phone Number" });
+      // }
       if (!isValidEmail(email)) {
         return res
           .status(400)
           .send({ success: false, message: "Invalid email" });
       }
-
-      // Check for existing organization by email or phone
-      //   const existingOrganizationByEmail = await models.Organization.findOne({
-      //     where: { email },
-      //   });
-      //   const existingOrganizationByPhone = await models.Organization.findOne({
-      //     where: { phone },
-      //   });
-      //   let organization;
-      //   if (existingOrganizationByEmail && existingOrganizationByPhone) {
-      //     // Both email and phone already exist
-      //     return res.status(400).send({
-      //       message: "either email and phone number are already in use",
-      //     });
-      //   }
-
-      //   if (existingOrganizationByEmail) {
-      //     // Email exists but phone doesn't match
-      //     if (existingOrganizationByEmail.phone !== phone) {
-      //       return res.status(400).send({
-      //         message: "phone already in use",
-      //       });
-      //     }
-      //     // Update existing organization
-      //     existingOrganizationByEmail.name = name;
-      //     existingOrganizationByEmail.password = hashedPassword;
-      //     await existingOrganizationByEmail.save({ transaction });
-      //     organization = existingOrganizationByEmail;
-      //   } else if (existingOrganizationByPhone) {
-      //     // Phone exists but email doesn't match
-      //     return res.status(400).send({
-      //       message: "Phone number already in use",
-      //     });
-      //   } else {
-      //     // Create new organization
-      //     const emailToken = generateToken({ email });
-      //     organization = await models.Organization.create(
-      //         {
-      //           name,
-      //           type,
-      //           description,
-      //           contact_person_name,
-      //           email,
-      //           phone,
-      //           password: hashedPassword,
-      //           location,
-      //           emailToken
-      //         },
-      //         { transaction }
-      //       );
-      //     }
-
-      //     await transaction.commit();
-      //     res.status(201).send({
-      //       id: organization.id,
-      //       name: organization.name,
-      //       email: organization.email,
-      //       phone: organization.phone
-      //     });
-      //   } catch (error) {
-      //     await transaction.rollback();
-      //     res.status(500).send({
-      //       message: error.message || "Some error occurred during signup.",
-      //     });
-      //   }
-      // };
       const existingOrganization = await models.Organization.findOne(
         {
           where: {
-            [Op.or]: [{ email: email.toLowerCase() }, { phone }],
+            [Op.or]: [{ email: email.toLowerCase() }, { phone: phone }],
           },
         },
         { transaction }
@@ -300,7 +229,7 @@ class OrganizationController extends BaseController {
       if (passwordValidationResult) {
         return res.status(400).send({
           success: false,
-          message: passwordValidationResult
+          message: passwordValidationResult,
         });
       }
       const hashedPassword = await bcrypt.hash(password, 10);
@@ -314,7 +243,6 @@ class OrganizationController extends BaseController {
           description,
           contact_person_name,
           email,
-          countryCode:countryCode,
           phone,
           password: hashedPassword,
           location,
@@ -343,7 +271,7 @@ class OrganizationController extends BaseController {
       });
     }
   };
-
+  // signUp of Organization by admin
   signupByAdmin = async (req, res) => {
     const transaction = await sequelize.transaction();
     try {
@@ -353,12 +281,10 @@ class OrganizationController extends BaseController {
         description,
         contact_person_name,
         email,
-        countryCode,
         phone,
         password,
         location,
       } = req.body;
-
       // mandatory field check
       if (!name) {
         return res
@@ -385,11 +311,11 @@ class OrganizationController extends BaseController {
           .status(400)
           .send({ success: false, message: "Email is required" });
       }
-      if(!countryCode){
-        return res
-        .status(400)
-        .send({ success: false, message: "Country Code is required" });
-      }
+      // if (!countryCode) {
+      //   return res
+      //     .status(400)
+      //     .send({ success: false, message: "Country Code is required" });
+      // }
       if (!phone) {
         return res
           .status(400)
@@ -405,14 +331,15 @@ class OrganizationController extends BaseController {
           .status(400)
           .send({ success: false, message: "Location is required" });
       }
+
       // Validate input fields
       if (
         [
           name,
           type,
+          description,
           contact_person_name,
           email,
-          countryCode,
           phone,
           password,
           location,
@@ -423,10 +350,23 @@ class OrganizationController extends BaseController {
           message: "Please provide all necessary fields",
         });
       }
+
       // Validate name
       const nameError = isValidLength(name);
       if (nameError) {
         return res.status(400).send({ success: false, message: nameError });
+      }
+      // validate type
+      const typeError = isValidLength(type);
+      if (typeError) {
+        return res.status(400).send({ success: false, message: typeError });
+      }
+      // validate description
+      const descriptionError = isValidDescription(description);
+      if (descriptionError) {
+        return res
+          .status(400)
+          .send({ success: false, message: descriptionError });
       }
       // validate contact person name
       const contactPersonNameError = isValidLength(contact_person_name);
@@ -435,18 +375,20 @@ class OrganizationController extends BaseController {
           .status(400)
           .send({ success: false, message: contactPersonNameError });
       }
-      // validate country code
-      const countryCodeError = isValidCountryCode(countryCode);
-      if (countryCodeError) {
-        return res.status(400).send({ success: false, message: countryCodeError });
+      // validate location
+      const locationError = isValidLocation(location);
+      if (locationError) {
+        return res.status(400).send({ success: false, message: locationError });
       }
-      // validate phone
-      if (!isValidPhone(phone)) {
-        return res
-          .status(400)
-          .send({ success: false, message: "Invalid Phone Number" });
-      }
-      // validate email
+      // const countryCodeError = isValidCountryCode(countryCode);
+      // if (countryCodeError) {
+      //   return res.status(400).send({ success: false, message: countryCodeError });
+      // }
+      // if (!isValidPhone(phone)) {
+      //   return res
+      //     .status(400)
+      //     .send({ success: false, message: "Invalid Phone Number" });
+      // }
       if (!isValidEmail(email)) {
         return res
           .status(400)
@@ -456,7 +398,7 @@ class OrganizationController extends BaseController {
       const existingOrganization = await models.Organization.findOne(
         {
           where: {
-            [Op.or]: [{ email: email.toLowerCase() }, { phone }],
+            [Op.or]: [{ email: email.toLowerCase() }, { phone: phone }],
           },
         },
         { transaction }
@@ -489,7 +431,7 @@ class OrganizationController extends BaseController {
       if (passwordValidationResult) {
         return res.status(400).send({
           success: false,
-          message: passwordValidationResult
+          message: passwordValidationResult,
         });
       }
       const hashedPassword = await bcrypt.hash(password, 10);
@@ -503,7 +445,6 @@ class OrganizationController extends BaseController {
           description,
           contact_person_name,
           email,
-          countryCode:countryCode,
           phone,
           password: hashedPassword,
           location,
@@ -533,87 +474,23 @@ class OrganizationController extends BaseController {
       });
     }
   };
-  //   Email OTP verification
-  emailOtpVerification = async (req, res) => {
-    const { email, otp } = req.body;
-
-    // Validate the OTP
-    if (!otp) {
-      return res
-        .status(400)
-        .json({ success: false, message: "OTP is required." });
-    }
-    if (!email) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Email is required." });
-    }
-
-    try {
-            // Convert email to lowercase before querying
-    const lowercaseEmail = email.toLowerCase().trim();
-      const organization = await models.Organization.findOne({
-        where: { email: lowercaseEmail },
-      });
-      console.log(organization);
-      if (!organization) {
-        return res.status(400).json({
-          success: false,
-          message: "Organization not found or invalid details.",
-        });
-      }
-
-      // Check OTP validity
-      if (organization.otp !== otp) {
-        return res.status(400).json({ success: false, message: "Invalid OTP" });
-      }
-      if (organization.otpExpire < Date.now()) {
-        return res
-          .status(400)
-          .json({ success: false, message: "expired OTP." });
-      }
-
-      // Update organization details
-      organization.isEmailVerified = true;
-      organization.otp = null;
-      organization.otpExpire = null;
-      await organization.save();
-
-      res.status(201).json({
-        success: true,
-        message: "Organization data",
-        organization: {
-          id: organization.id,
-          name: organization.name,
-          email: organization.email,
-          phone: organization.phone,
-          isEmailVerified: organization.isEmailVerified,
-        },
-      });
-    } catch (error) {
-      res.status(500).json({
-        success: false,
-        message: "Server Error",
-        error: error.message,
-      });
-    }
-  };
+  // signIn Organization
   signin = async (req, res) => {
     const { email, password } = req.body;
+    if (!email || !password) {
+      return res
+        .status(400)
+        .send({ success: false, message: "Please Enter Email & Password" });
+    }
     if ([email, password].some((field) => field?.trim() === "")) {
       return res.status(400).send({
         success: false,
         message: "Please provide all necessary fields",
       });
     }
-    if (!email || !password) {
-      return res
-        .status(400)
-        .send({ success: false, message: "Please Enter Email & Password" });
-    }
     try {
       const organization = await models.Organization.findOne({
-        where: { email: email.trim() },
+        where: { email: email.toLowerCase().trim() },
       });
       if (!organization) {
         return res
@@ -657,7 +534,7 @@ class OrganizationController extends BaseController {
       });
     }
   };
-
+  // verify email (not in use)
   verifyEmail = async (req, res) => {
     const { token } = req.query;
 
@@ -684,245 +561,113 @@ class OrganizationController extends BaseController {
       });
     }
   };
-  // forget password
-  forgotPassword = async (req, res) => {
-    const { email } = req.body;
-
-    // Validate input fields
-    if (!email) {
-      return res
-        .status(400)
-        .send({ success: false, message: "Missing email id" });
-    }
-
-    if (!isValidEmail(email)) {
-      return res
-        .status(400)
-        .send({ success: false, message: "Invalid email address" });
-    }
-
-    try {
-      // Find the organization by email
-      const organization = await models.Organization.findOne({
-        where: {
-          email: email.trim(),
-        },
-      });
-
-      if (!organization) {
-        return res
-          .status(404)
-          .send({ success: false, message: "Organization not found" });
-      }
-      if (!organization.isEmailVerified) {
-        return res
-          .status(400)
-          .send({ success: false, message: "Organization is not verified" });
-      }
-
-      // Get ResetPassword Token
-      const otp = generateOtp(); // Assuming you have a method to generate the OTP
-      organization.otp = otp;
-      organization.otpExpire = Date.now() + 15 * 60 * 1000; // Set OTP expiration time (e.g., 15 minutes)
-
-      await organization.save({ validate: false });
-
-      const message = `Your One Time Password is ${otp}`;
-
-      await sendEmail({
-        email: organization.email,
-        subject: `Password Recovery`,
-        message,
-      });
-
-      res.status(200).json({
-        success: true,
-        message: `OTP sent to ${organization.email} successfully`,
-        organizationId: organization.id,
-      });
-    } catch (error) {
-      organization.otp = null;
-      organization.otpExpire = null;
-      await organization.save({ validate: false });
-
-      return res.status(500).send({ success: false, message: error.message });
-    }
-  };
-
-  // reset password
-  resetPassword = async (req, res) => {
-    const { password, otp } = req.body;
-    const organizationId = req.params.organizationId;
-
-    // Validate input fields
-    if (!password || !otp) {
-      return res.status(400).send({
-        success: false,
-        message: "Missing required fields: password or OTP",
-      });
-    }
-    if (!organizationId) {
-      return res.status(400).send({
-        success: false,
-        message: "Missing organizationId in the params",
-      });
-    }
-    const hashedPassword = await bcrypt.hash(password, 10);
-    try {
-      // Find the organization by ID
-      const organization = await models.Organization.findByPk(organizationId);
-
-      if (!organization) {
-        return res
-          .status(400)
-          .send({ success: false, message: "Organization not found" });
-      }
-
-      // Verify the OTP
-      if (organization.otp !== otp.trim()) {
-        return res.status(400).send({ success: false, message: "Invalid OTP" });
-      }
-      if (organization.otpExpire < Date.now()) {
-        return res.status(400).send({ success: false, message: "expired OTP" });
-      }
-
-      // Update the organization's password and clear OTP fields
-      organization.password = hashedPassword;
-      organization.otp = null;
-      organization.otpExpire = null;
-
-      await organization.save({ validate: true });
-
-      // Exclude password from the response
-      const updatedOrganization = await models.Organization.findByPk(
-        organization.id,
-        {
-          attributes: {
-            exclude: ["password"],
-          },
-        }
-      );
-
-      return res.status(200).json({
-        success: true,
-        message: `Password updated for ${updatedOrganization.email}`,
-      });
-    } catch (error) {
-      return res.status(500).send({ success: false, message: error.message });
-    }
-  };
-
-  // send OTP
-  sendOtp = async (req, res) => {
-    const { email } = req.body;
-
-    if (!email) {
-      return res.status(400).send({ success: false, message: "Missing Email" });
-    }
-
-    if (!isValidEmail(email)) {
-      return res.status(400).send({ success: false, message: "Invalid Email" });
-    }
-
-    try {
-       // Convert email to lowercase before querying
-    const lowercaseEmail = email.toLowerCase().trim();
-      const organization = await models.Organization.findOne({
-        where: {
-          email: lowercaseEmail,
-        },
-      });
-
-      if (!organization) {
-        return res
-          .status(404)
-          .send({ success: false, message: "Organization not found" });
-      }
-
-      const otp = generateOtp();
-      organization.otp = otp;
-      organization.otpExpire = Date.now() + 15 * 60 * 1000;
-
-      await organization.save({ validate: false });
-
-      const message = `Your One Time Password (OTP) is ${otp}`;
-      try {
-        await sendEmail({
-          email: organization.email,
-          subject: `One-Time Password (OTP) for Verification`,
-          message,
-        });
-
-        res.status(200).json({
-          success: true,
-          message: `OTP sent to ${organization.email} successfully`,
-          email: organization.email,
-          organizationId: organization.id,
-        });
-      } catch (emailError) {
-        organization.otp = null;
-        organization.otpExpire = null;
-        await organization.save({ validate: false });
-
-        console.error("Failed to send OTP email:", emailError);
-        return res
-          .status(500)
-          .send({ success: false, message: emailError.message });
-      }
-    } catch (error) {
-      return res.status(500).send({ success: false, message: error.message });
-    }
-  };
+  // update by admin
   updateByAdmin = async (req, res) => {
     try {
       const id = req.params.id;
-
+      const { name, email, type, description, location } = req.body;
+  
+      // Check for password field
       if ("password" in req.body) {
         return res.status(400).json({
           success: false,
           error: "Password cannot be updated by Admin",
         });
       }
-
-      const [updatedRows] = await models.Organization.update(req.body, {
+  
+      // Validate name
+      if (name !== undefined) {
+        const nameError = isValidLength(name);
+        if (nameError) {
+          return res.status(400).send({ success: false, message: nameError });
+        }
+      }
+  
+      // Validate email
+      if (email !== undefined) {
+        if (!isValidEmail(email)) {
+          return res.status(400).send({ success: false, message: "Invalid email" });
+        }
+      }
+  
+      // Validate type
+      if (type !== undefined) {
+        const typeError = isValidLength(type);
+        if (typeError) {
+          return res.status(400).send({ success: false, message: typeError });
+        }
+      }
+  
+      // Validate description
+      if (description !== undefined) {
+        const descriptionError = isValidDescription(description);
+        if (descriptionError) {
+          return res.status(400).send({ success: false, message: descriptionError });
+        }
+      }
+  
+      // Validate location
+      if (location !== undefined) {
+        const locationError = isValidLocation(location);
+        if (locationError) {
+          return res.status(400).send({ success: false, message: locationError });
+        }
+      }
+  
+      // Prepare the update data object
+      const updateData = {};
+      if (name !== undefined) updateData.name = name;
+      if (email !== undefined) updateData.email = email;
+      if (type !== undefined) updateData.type = type;
+      if (description !== undefined) updateData.description = description;
+      if (location !== undefined) updateData.location = location;
+  
+      // Perform the update operation
+      const [updatedRows] = await models.Organization.update(updateData, {
         where: { id: id },
       });
-
+  
       if (updatedRows > 0) {
         const updatedItem = await models.Organization.findByPk(id, {
           attributes: { exclude: ["password"] },
         });
-        res.json({
+        return res.json({
           success: true,
-          message: "updated successfully by admin",
+          message: "Updated successfully by admin",
           data: updatedItem,
         });
       } else {
-        res.status(404).json({ success: false, error: "Item not found" });
+        return res.status(404).json({ success: false, error: "Item not found" });
       }
     } catch (error) {
-      res.status(500).json({ success: false, error: error.message });
+      return res.status(500).json({ success: false, error: error.message });
     }
   };
+  
+  // update by organization
   updateByOrganization = async (req, res) => {
     try {
       const id = req.params.id;
       const { name, contact_person_name } = req.body;
-  
+
       // Check if at least one of name or contact_person_name is provided
       if (!name && !contact_person_name) {
         return res.status(400).json({
           success: false,
-          error: "Either name or contact person name must be provided for update",
+          error:
+            "Either name or contact person name must be provided for update",
         });
       }
-  
+
       const updateData = {};
-  
+
       // Validate and add name if provided
       if (name !== undefined) {
-        if (typeof name !== 'string' || name.trim() === "") {
-          return res.status(400).send({ success: false, message: "Name must be a non-empty string" });
+        if (typeof name !== "string" || name.trim() === "") {
+          return res.status(400).send({
+            success: false,
+            message: "Name must be a non-empty string",
+          });
         }
         const nameError = isValidLength(name);
         if (nameError) {
@@ -930,32 +675,42 @@ class OrganizationController extends BaseController {
         }
         updateData.name = name.trim();
       }
-  
+
       // Validate and add contact_person_name if provided
       if (contact_person_name !== undefined) {
-        if (typeof contact_person_name !== 'string' || contact_person_name.trim() === "") {
-          return res.status(400).send({ success: false, message: "Contact Person Name must be a non-empty string" });
+        if (
+          typeof contact_person_name !== "string" ||
+          contact_person_name.trim() === ""
+        ) {
+          return res.status(400).send({
+            success: false,
+            message: "Contact Person Name must be a non-empty string",
+          });
         }
         const contactPersonNameError = isValidLength(contact_person_name);
         if (contactPersonNameError) {
-          return res.status(400).send({ success: false, message: contactPersonNameError });
+          return res
+            .status(400)
+            .send({ success: false, message: contactPersonNameError });
         }
         updateData.contact_person_name = contact_person_name.trim();
       }
-  
+
       const [updated] = await models.Organization.update(updateData, {
         where: { id: id },
       });
-  
+
       if (updated) {
         const updatedItem = await models.Organization.findByPk(id, {
           attributes: { exclude: ["password"] },
         });
-  
+
         if (!updatedItem) {
-          return res.status(404).json({ success: false, error: "Item not found after update" });
+          return res
+            .status(404)
+            .json({ success: false, error: "Item not found after update" });
         }
-  
+
         res.json({
           success: true,
           message: "Updated successfully by agent",

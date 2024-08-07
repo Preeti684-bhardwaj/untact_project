@@ -4,15 +4,12 @@ const BaseController = require("./base");
 const models = require("../models");
 const {
   isValidEmail,
-  isValidCountryCode,
-  isValidPhone,
   isValidPassword,
   isValidTimeString,
   parseTimeString,
   isValidLength,
   updateDailySlotAvailability,
 } = require("../utils/validation");
-const sendEmail = require("../utils/sendEmail.js");
 const moment = require("moment");
 const { Op } = require("sequelize");
 const sequelize = require("../config/db.config").sequelize; // Ensure this path is correct
@@ -22,22 +19,6 @@ const generateToken = (agent) => {
   return jwt.sign({ obj: agent }, process.env.JWT_SECRET, {
     expiresIn: "72h", // expires in 72 hours
   });
-};
-const generateOtp = () => {
-  // Define the possible characters for the OTP
-  const chars = "0123456789";
-  // Define the length of the OTP
-  const len = 6;
-  let otp = "";
-  // Generate the OTP
-  for (let i = 0; i < len; i++) {
-    otp += chars[Math.floor(Math.random() * chars.length)];
-  }
-
-  this.otp = otp;
-  this.otpExpire = Date.now() + 15 * 60 * 1000;
-
-  return otp;
 };
 
 class AgentController extends BaseController {
@@ -52,10 +33,6 @@ class AgentController extends BaseController {
     this.router.post("/signupagent", this.signupByAgent.bind(this));
     this.router.post("/signin", this.signin.bind(this));
     this.router.get("/verify-email", this.verifyEmail.bind(this));
-    this.router.post("/forgotPassword", this.forgotPassword.bind(this));
-    this.router.post("/resetpassword/:agentId", this.resetPassword.bind(this));
-    this.router.post("/sendOtp", this.sendOtp.bind(this));
-    this.router.post("/otpVerification", this.emailOtpVerification.bind(this));
     this.router.put(
       "/updateAgentByAdmin/:id",
       authenticate,
@@ -100,12 +77,12 @@ class AgentController extends BaseController {
   async afterCreate(req, res, newObject, transaction) {
     // Add additional setup after creating an agent, if necessary
   }
-
+  // signUp by agent
   signupByAgent = async (req, res) => {
-    const transaction = await sequelize.transaction();
+    let transaction;
     try {
-      const { name, email, countryCode, phone, password } =
-        req.body;
+      transaction = await sequelize.transaction();
+      const { name, email, phone, password } = req.body;
 
       // mandatory field check
       if (!name) {
@@ -118,11 +95,11 @@ class AgentController extends BaseController {
           .status(400)
           .send({ success: false, message: "Email is required" });
       }
-      if (!countryCode) {
-        return res
-          .status(400)
-          .send({ success: false, message: "countryCode is required" });
-      }
+      // if (!countryCode) {
+      //   return res
+      //     .status(400)
+      //     .send({ success: false, message: "countryCode is required" });
+      // }
       if (!phone) {
         return res
           .status(400)
@@ -133,25 +110,18 @@ class AgentController extends BaseController {
           .status(400)
           .send({ success: false, message: "Password is required" });
       }
-  
-      // Validate required fields
-      const requiredFields = {
-        name,
-        email,
-        countryCode,
-        phone,
-        password
-      };
-      for (const [field, value] of Object.entries(requiredFields)) {
-        if (!value) {
-          await transaction.rollback();
-          return res
-            .status(400)
-            .send({ success: false, message: `${field} is required` });
-        }
+
+      // Validate input fields
+      if (
+        [name, email, phone, password].some((field) => field?.trim() === "")
+      ) {
+        return res.status(400).send({
+          success: false,
+          message: "Please provide all necessary fields",
+        });
       }
-      const startTime="09:00:00"
-      const endTime="18:00:00"
+      const startTime = "09:00:00";
+      const endTime = "18:00:00";
 
       if (!isValidTimeString(startTime) || !isValidTimeString(endTime)) {
         await transaction.rollback();
@@ -178,17 +148,17 @@ class AgentController extends BaseController {
       if (nameError) {
         return res.status(400).send({ success: false, message: nameError });
       }
-      const countryCodeError = isValidCountryCode(countryCode);
-      if (countryCodeError) {
-        return res
-          .status(400)
-          .send({ success: false, message: countryCodeError });
-      }
-      if (!isValidPhone(phone)) {
-        return res
-          .status(400)
-          .send({ success: false, message: "Invalid Phone Number" });
-      }
+      // const countryCodeError = isValidCountryCode(countryCode);
+      // if (countryCodeError) {
+      //   return res
+      //     .status(400)
+      //     .send({ success: false, message: countryCodeError });
+      // }
+      // if (!isValidPhone(phone)) {
+      //   return res
+      //     .status(400)
+      //     .send({ success: false, message: "Invalid Phone Number" });
+      // }
 
       if (!isValidEmail(email)) {
         return res
@@ -240,12 +210,11 @@ class AgentController extends BaseController {
         {
           name,
           email: email.toLowerCase().trim(),
-          countryCode: countryCode,
           phone,
           password: hashedPassword,
           emailToken,
-          startTime,
-          endTime
+          startTime: startTime,
+          endTime: endTime,
         },
         { transaction }
       );
@@ -269,13 +238,12 @@ class AgentController extends BaseController {
       });
     }
   };
-
-  //   sign up by admin
+  //   signUp Agent by admin
   signupByAdmin = async (req, res) => {
-    const transaction = await sequelize.transaction();
+    let transaction;
     try {
-      const { name, email, countryCode, phone, password, startTime, endTime } =
-        req.body;
+      transaction = await sequelize.transaction();
+      const { name, email, phone, password, startTime, endTime } = req.body;
 
       // mandatory field check
       if (!name) {
@@ -288,11 +256,11 @@ class AgentController extends BaseController {
           .status(400)
           .send({ success: false, message: "Email is required" });
       }
-      if (!countryCode) {
-        return res
-          .status(400)
-          .send({ success: false, message: "countryCode is required" });
-      }
+      // if (!countryCode) {
+      //   return res
+      //     .status(400)
+      //     .send({ success: false, message: "countryCode is required" });
+      // }
       if (!phone) {
         return res
           .status(400)
@@ -310,23 +278,14 @@ class AgentController extends BaseController {
         });
       }
 
-      // Validate required fields
-      const requiredFields = {
-        name,
-        email,
-        countryCode,
-        phone,
-        password,
-        startTime,
-        endTime,
-      };
-      for (const [field, value] of Object.entries(requiredFields)) {
-        if (!value) {
-          await transaction.rollback();
-          return res
-            .status(400)
-            .send({ success: false, message: `${field} is required` });
-        }
+      // Validate input fields
+      if (
+        [name, email, phone, password].some((field) => field?.trim() === "")
+      ) {
+        return res.status(400).send({
+          success: false,
+          message: "Please provide all necessary fields",
+        });
       }
       if (!isValidTimeString(startTime) || !isValidTimeString(endTime)) {
         await transaction.rollback();
@@ -353,17 +312,17 @@ class AgentController extends BaseController {
       if (nameError) {
         return res.status(400).send({ success: false, message: nameError });
       }
-      const countryCodeError = isValidCountryCode(countryCode);
-      if (countryCodeError) {
-        return res
-          .status(400)
-          .send({ success: false, message: countryCodeError });
-      }
-      if (!isValidPhone(phone)) {
-        return res
-          .status(400)
-          .send({ success: false, message: "Invalid Phone Number" });
-      }
+      // const countryCodeError = isValidCountryCode(countryCode);
+      // if (countryCodeError) {
+      //   return res
+      //     .status(400)
+      //     .send({ success: false, message: countryCodeError });
+      // }
+      // if (!isValidPhone(phone)) {
+      //   return res
+      //     .status(400)
+      //     .send({ success: false, message: "Invalid Phone Number" });
+      // }
 
       if (!isValidEmail(email)) {
         return res
@@ -415,7 +374,6 @@ class AgentController extends BaseController {
         {
           name,
           email: email.toLowerCase().trim(),
-          countryCode: countryCode,
           phone,
           password: hashedPassword,
           emailToken,
@@ -446,73 +404,7 @@ class AgentController extends BaseController {
       });
     }
   };
-
-  //   Email OTP verification
-  emailOtpVerification = async (req, res) => {
-    const { email, otp } = req.body;
-    // Validate the Email
-    if (!email) {
-      return res
-        .status(400)
-        .json({ success: false, message: "OTP is required." });
-    }
-    // Validate the OTP
-    if (!otp) {
-      return res
-        .status(400)
-        .json({ success: false, message: "OTP is required." });
-    }
-
-    try {
-      // Convert email to lowercase before querying
-      const lowercaseEmail = email.toLowerCase().trim();
-      const agent = await models.Agent.findOne({
-        where: { email: lowercaseEmail },
-      });
-      console.log(agent);
-      if (!agent) {
-        return res.status(400).json({
-          success: false,
-          message: "Agent not found or invalid details.",
-        });
-      }
-
-      // Check OTP validity
-      if (agent.otp !== otp) {
-        return res.status(400).json({ success: false, message: "Invalid OTP" });
-      }
-      if (agent.otpExpire < Date.now()) {
-        return res
-          .status(400)
-          .json({ success: false, message: "expired OTP." });
-      }
-
-      // Update agent details
-      agent.isEmailVerified = true;
-      agent.otp = null;
-      agent.otpExpire = null;
-      await agent.save();
-
-      res.status(201).json({
-        success: true,
-        message: "Agent data",
-        agent: {
-          id: agent.id,
-          name: agent.name,
-          email: agent.email,
-          phone: agent.phone,
-          isEmailVerified: agent.isEmailVerified,
-        },
-      });
-    } catch (error) {
-      res.status(500).json({
-        success: false,
-        message: "Server Error",
-        error: error.message,
-      });
-    }
-  };
-
+  // signIn Agent
   signin = async (req, res) => {
     const { email, password } = req.body;
     if ([email, password].some((field) => field?.trim() === "")) {
@@ -569,7 +461,7 @@ class AgentController extends BaseController {
       });
     }
   };
-
+  // verify Email (not in use)
   verifyEmail = async (req, res) => {
     const { token } = req.query;
 
@@ -591,313 +483,154 @@ class AgentController extends BaseController {
       });
     }
   };
-
-  // forget password
-  forgotPassword = async (req, res) => {
-    const { email } = req.body;
-
-    // Validate input fields
-    if (!email) {
-      return res
-        .status(400)
-        .send({ success: false, message: "Missing email id" });
-    }
-
-    if (!isValidEmail(email)) {
-      return res
-        .status(400)
-        .send({ success: false, message: "Invalid email address" });
-    }
-
-    try {
-      // Find the agent by email
-      const agent = await models.Agent.findOne({
-        where: {
-          email: email.toLowerCase().trim(),
-        },
-      });
-
-      if (!agent) {
-        return res
-          .status(404)
-          .send({ success: false, message: "Agent not found" });
-      }
-      if (!agent.isEmailVerified) {
-        return res
-          .status(400)
-          .send({ success: false, message: "Agent is not verified" });
-      }
-
-      // Get ResetPassword Token
-      const otp = generateOtp(); // Assuming you have a method to generate the OTP
-      agent.otp = otp;
-      agent.otpExpire = Date.now() + 15 * 60 * 1000; // Set OTP expiration time (e.g., 15 minutes)
-
-      await agent.save({ validate: false });
-
-      const message = `Your One Time Password is ${otp}`;
-
-      await sendEmail({
-        email: agent.email,
-        subject: `Password Recovery`,
-        message,
-      });
-
-      res.status(200).json({
-        success: true,
-        message: `OTP sent to ${agent.email} successfully`,
-        agentId: agent.id,
-      });
-    } catch (error) {
-      agent.otp = null;
-      agent.otpExpire = null;
-      await agent.save({ validate: false });
-
-      return res.status(500).send({ success: false, message: error.message });
-    }
-  };
-
-  // reset password
-  resetPassword = async (req, res) => {
-    const { password, otp } = req.body;
-    const agentId = req.params.agentId;
-
-    // Validate input fields
-    if (!password) {
-      return res.status(400).send({
-        success: false,
-        message: "Missing password",
-      });
-    }
-    if (!otp) {
-      return res.status(400).send({
-        success: false,
-        message: "Missing OTP",
-      });
-    }
-    if (!agentId) {
-      return res
-        .status(400)
-        .send({ success: false, message: "Missing AgentId in the params" });
-    }
-    const passwordValidationResult = isValidPassword(password);
-    if (passwordValidationResult) {
-      return res.status(400).send({
-        success: false,
-        message: passwordValidationResult,
-      });
-    }
-    const hashedPassword = await bcrypt.hash(password, 10);
-
-    try {
-      // Find the agent by ID
-      const agent = await models.Agent.findByPk(agentId);
-
-      if (!agent) {
-        return res
-          .status(400)
-          .send({ success: false, message: "Agent not found" });
-      }
-
-      // Verify the OTP
-      if (agent.otp !== otp.trim()) {
-        return res.status(400).send({ success: false, message: "Invalid OTP" });
-      }
-      if (agent.otpExpire < Date.now()) {
-        return res.status(400).send({ success: false, message: "expired OTP" });
-      }
-
-      // Update the agent's password and clear OTP fields
-      agent.password = hashedPassword;
-      agent.otp = null;
-      agent.otpExpire = null;
-
-      await agent.save({ validate: true });
-
-      // Exclude password from the response
-      const updatedAgent = await models.Agent.findByPk(agent.id, {
-        attributes: {
-          exclude: ["password"],
-        },
-      });
-
-      return res.status(200).json({
-        success: true,
-        message: `Password updated for ${updatedAgent.email}`,
-      });
-    } catch (error) {
-      return res.status(500).send({ success: false, message: error.message });
-    }
-  };
-
-  // send OTP
-  sendOtp = async (req, res) => {
-    const { email } = req.body;
-
-    if (!email) {
-      return res.status(400).send({ success: false, message: "Missing Email" });
-    }
-
-    if (!isValidEmail(email)) {
-      return res.status(400).send({ message: "Invalid Email" });
-    }
-
-    try {
-      // Convert email to lowercase before querying
-      const lowercaseEmail = email.toLowerCase().trim();
-      const agent = await models.Agent.findOne({
-        where: {
-          email: lowercaseEmail,
-        },
-      });
-
-      if (!agent) {
-        return res
-          .status(404)
-          .send({ success: false, message: "Agent not found" });
-      }
-
-      const otp = generateOtp();
-      agent.otp = otp;
-      agent.otpExpire = Date.now() + 15 * 60 * 1000;
-
-      await agent.save({ validate: false });
-
-      const message = `Your One Time Password (OTP) is ${otp}`;
-      try {
-        await sendEmail({
-          email: agent.email,
-          subject: `One-Time Password (OTP) for Verification`,
-          message,
-        });
-
-        res.status(200).json({
-          success: true,
-          message: `OTP sent to ${agent.email} successfully`,
-          email: agent.email,
-          agentId: agent.id,
-        });
-      } catch (emailError) {
-        agent.otp = null;
-        agent.otpExpire = null;
-        await agent.save({ validate: false });
-
-        console.error("Failed to send OTP email:", emailError);
-        return res
-          .status(500)
-          .send({ success: false, message: emailError.message });
-      }
-    } catch (error) {
-      return res.status(500).send({ success: false, message: error.message });
-    }
-  };
+  // update Agent by admin
   updateAgentByAdmin = async (req, res) => {
     const transaction = await sequelize.transaction();
     try {
       const id = req.params.id;
-      const { startTime, endTime, ...otherFields } = req.body;
-
-      if ("password" in otherFields) {
+      const { startTime, endTime, name, email, phone } = req.body;
+  
+      // Validate that no password is included in the request body
+      if ("password" in req.body) {
+        await transaction.rollback();
         return res.status(400).json({
           success: false,
           error: "Password cannot be updated by Admin",
         });
       }
-      if (startTime || endTime) {
-        if (!isValidTimeString(startTime) || !isValidTimeString(endTime)) {
-          await transaction.rollback();
-          return res.status(400).send({
-            success: false,
-            message:
-              "Invalid time format. Please provide times in HH:mm:ss format.",
-          });
+  
+      // Initialize updateData object
+      const updateData = {};
+  
+      // Validate and sanitize startTime and endTime
+      if (startTime !== undefined || endTime !== undefined) {
+        if (startTime !== undefined) {
+          const trimmedStartTime = startTime.trim();
+          if (trimmedStartTime === "") {
+            await transaction.rollback();
+            return res.status(400).send({
+              success: false,
+              message: "Start time cannot be empty or whitespace.",
+            });
+          }
+          if (!isValidTimeString(trimmedStartTime)) {
+            await transaction.rollback();
+            return res.status(400).send({
+              success: false,
+              message: "Invalid start time format. Please provide time in HH:mm:ss format.",
+            });
+          }
+          updateData.startTime = trimmedStartTime;
         }
-
-        const startMoment = moment(startTime, "HH:mm:ssZ");
-        const endMoment = moment(endTime, "HH:mm:ssZ");
-
-        if (startMoment.isSameOrAfter(endMoment)) {
-          await transaction.rollback();
-          return res.status(400).send({
-            success: false,
-            message: "Start time must be before end time.",
-          });
+  
+        if (endTime !== undefined) {
+          const trimmedEndTime = endTime.trim();
+          if (trimmedEndTime === "") {
+            await transaction.rollback();
+            return res.status(400).send({
+              success: false,
+              message: "End time cannot be empty or whitespace.",
+            });
+          }
+          if (!isValidTimeString(trimmedEndTime)) {
+            await transaction.rollback();
+            return res.status(400).send({
+              success: false,
+              message: "Invalid end time format. Please provide time in HH:mm:ss format.",
+            });
+          }
+          updateData.endTime = trimmedEndTime;
+  
+          // Ensure startTime is before endTime
+          if (updateData.startTime && moment(updateData.startTime, "HH:mm:ss").isSameOrAfter(moment(updateData.endTime, "HH:mm:ss"))) {
+            await transaction.rollback();
+            return res.status(400).send({
+              success: false,
+              message: "Start time must be before end time.",
+            });
+          }
         }
       }
-      // Validate name
-      if (otherFields.name) {
-        const nameError = isValidLength(otherFields.name);
+  
+      // Validate and sanitize name
+      if (name !== undefined) {
+        const trimmedName = name.trim();
+        if (trimmedName === "") {
+          await transaction.rollback();
+          return res.status(400).send({
+            success: false,
+            message: "Name cannot be empty or whitespace.",
+          });
+        }
+        const nameError = isValidLength(trimmedName);
         if (nameError) {
+          await transaction.rollback();
           return res.status(400).send({ success: false, message: nameError });
         }
+        updateData.name = trimmedName;
       }
-      // validate email
-      if (otherFields.email) {
-        if ([otherFields.email].some((field) => field?.trim() === "")) {
+  
+      // Validate and sanitize email
+      if (email !== undefined) {
+        const trimmedEmail = email.trim();
+        if (trimmedEmail === "") {
+          await transaction.rollback();
           return res.status(400).send({
             success: false,
-            message: "Missing email",
+            message: "Email cannot be empty or whitespace.",
           });
         }
-        if (!isValidEmail(otherFields.email)) {
-          return res
-            .status(400)
-            .send({ success: false, message: "Invalid email" });
+        if (!isValidEmail(trimmedEmail)) {
+          await transaction.rollback();
+          return res.status(400).send({ success: false, message: "Invalid email" });
         }
+        updateData.email = trimmedEmail;
       }
-      // validate countryCode
-      if (otherFields.countryCode) {
-        if ([otherFields.countryCode].some((field) => field?.trim() === "")) {
+  
+      // Validate and sanitize phone
+      if (phone !== undefined) {
+        const trimmedPhone = phone.trim();
+        if (trimmedPhone === "") {
+          await transaction.rollback();
           return res.status(400).send({
             success: false,
-            message: "Missing country code",
+            message: "Phone number cannot be empty or whitespace.",
           });
         }
-        const countryCodeError = isValidCountryCode(otherFields.countryCode);
-        if (countryCodeError) {
-          return res
-            .status(400)
-            .send({ success: false, message: countryCodeError });
-        }
+        updateData.phone = trimmedPhone;
       }
-      // validate phone
-      if (otherFields.phone) {
-        if ([otherFields.phone].some((field) => field?.trim() === "")) {
-          return res.status(400).send({
-            success: false,
-            message: "Missing Phone",
-          });
-        }
-        if (!isValidPhone(otherFields.phone)) {
-          return res
-            .status(400)
-            .send({ success: false, message: "Invalid Phone Number" });
-        }
+  
+      // Perform the update operation only if there are fields to update
+      if (Object.keys(updateData).length === 0) {
+        await transaction.rollback();
+        return res.status(400).json({ success: false, error: "No valid fields provided for update." });
       }
-
-      const [updatedRows] = await models.Agent.update(
-        { ...otherFields, startTime, endTime },
-        {
-          where: { id: id },
-        },{transaction}
-      );
-
+  
+      const [updatedRows] = await models.Agent.update(updateData, {
+        where: { id: id },
+        transaction,
+      });
+  
       if (updatedRows > 0) {
+        await transaction.commit();
         const updatedItem = await models.Agent.findByPk(id, {
           attributes: { exclude: ["password"] },
         });
-        res.json({
+        return res.json({
           success: true,
-          message: "updated successfully by admin",
+          message: "Updated successfully by admin",
           data: updatedItem,
         });
       } else {
-        res.status(404).json({ success: false, error: "Item not found" });
+        await transaction.rollback();
+        return res.status(404).json({ success: false, error: "Agent not found" });
       }
     } catch (error) {
-      res.status(500).json({ success: false, error: error.message });
+      await transaction.rollback();
+      return res.status(500).json({ success: false, error: error.message });
     }
-  };
+  };  
+  // update By Agent
   updateByAgent = async (req, res) => {
     try {
       const id = req.params.id;
@@ -1124,7 +857,7 @@ class AgentController extends BaseController {
       res.status(500).json({ error: "Internal server error" });
     }
   };
-
+  // assigning JobCard To Agent
   assignJobCardToAgent = async (req, res) => {
     try {
       const { jobCards, agentId, selectedSlots } = req.body;
@@ -1198,7 +931,6 @@ class AgentController extends BaseController {
         const startTime = new Date(slot.start);
         const endTime = new Date(slot.end);
 
-
         if (isNaN(startTime) || isNaN(endTime) || startTime >= endTime) {
           return res
             .status(400)
@@ -1251,11 +983,13 @@ class AgentController extends BaseController {
       //   .toISOString()
       //   .split("T")[0];
       const dailySlot = await models.DailySlot.findOne({
-        where: { agentId:agentId },
+        where: { agentId: agentId },
       });
 
       if (!dailySlot) {
-        return res.status(404).json({ error: `DailySlot of agent ${agentId} not found` });
+        return res
+          .status(404)
+          .json({ error: `DailySlot of agent ${agentId} not found` });
       }
 
       // Update DailySlot to mark selected slots as unavailable
@@ -1274,7 +1008,7 @@ class AgentController extends BaseController {
       return res.status(500).json({ error: "Internal server error" });
     }
   };
-
+  // removing jobCard From agent
   removeJobCardFromAgent = async (req, res) => {
     try {
       const { jobCardId, agentId } = req.body;
@@ -1320,6 +1054,7 @@ class AgentController extends BaseController {
       return res.status(500).json({ error: "Internal server error" });
     }
   };
+  // get agent JobCard count
   getAgentJobCardCounts = async (req, res) => {
     try {
       const { agentId } = req.params;

@@ -4,12 +4,9 @@ const BaseController = require("./base");
 const models = require("../models");
 const {
   isValidEmail,
-  isValidPhone,
-  isValidCountryCode,
   isValidPassword,
   isValidLength,
 } = require("../utils/validation");
-const sendEmail = require("../utils/sendEmail.js");
 const { Op } = require("sequelize");
 const sequelize = require("../config/db.config").sequelize; // Ensure this path is correct
 
@@ -18,22 +15,6 @@ const generateToken = (admin) => {
     expiresIn: "72h", // expires in 72 hours
   });
 };
-const generateOtp = () => {
-  // Define the possible characters for the OTP
-  const chars = "0123456789";
-  // Define the length of the OTP
-  const len = 6;
-  let otp = "";
-  // Generate the OTP
-  for (let i = 0; i < len; i++) {
-    otp += chars[Math.floor(Math.random() * chars.length)];
-  }
-
-  this.otp = otp;
-  this.otpExpire = Date.now() + 15 * 60 * 1000;
-
-  return otp;
-};
 
 class AdminController extends BaseController {
   constructor() {
@@ -41,10 +22,6 @@ class AdminController extends BaseController {
     this.router.post("/signup", this.signup.bind(this));
     this.router.post("/signin", this.signin.bind(this));
     this.router.get("/verify-email", this.verifyEmail.bind(this));
-    this.router.post("/forgotPassword", this.forgotPassword.bind(this));
-    this.router.post("/resetpassword/:adminId", this.resetPassword.bind(this));
-    this.router.post("/sendOtp", this.sendOtp.bind(this));
-    this.router.post("/otpVerification", this.emailOtpVerification.bind(this));
     this.router.put("/updateAdmin/:id", this.updateAdmin.bind(this));
   }
 
@@ -73,12 +50,12 @@ class AdminController extends BaseController {
   async afterCreate(req, res, newObject, transaction) {
     // Add additional setup after creating an admin, if necessary
   }
-
+  // signUp of Admin
   signup = async (req, res) => {
     let transaction;
     try {
       transaction = await sequelize.transaction();
-      const { name, email,countryCode, phone, password } = req.body;
+      const { name, email, phone, password } = req.body;
       // mandatory field check
       if (!name) {
         return res
@@ -90,11 +67,11 @@ class AdminController extends BaseController {
           .status(400)
           .send({ success: false, message: "Email is required" });
       }
-      if (!countryCode) {
-        return res
-          .status(400)
-          .send({ success: false, message: "countryCode is required" });
-      }
+      // if (!countryCode) {
+      //   return res
+      //     .status(400)
+      //     .send({ success: false, message: "countryCode is required" });
+      // }
       if (!phone) {
         return res
           .status(400)
@@ -108,14 +85,12 @@ class AdminController extends BaseController {
 
       // Validate input fields
       if (
-        [name, email,countryCode, phone, password].some((field) => field?.trim() === "")
+        [name, email, phone, password].some((field) => field?.trim() === "")
       ) {
-        return res
-          .status(400)
-          .send({
-            success: false,
-            message: "Please provide all necessary fields",
-          });
+        return res.status(400).send({
+          success: false,
+          message: "Please provide all necessary fields",
+        });
       }
       // Validate name
       const nameError = isValidLength(name);
@@ -128,15 +103,15 @@ class AdminController extends BaseController {
           .status(400)
           .send({ success: false, message: "Invalid email" });
       }
-      const countryCodeError = isValidCountryCode(countryCode);
-      if (countryCodeError) {
-        return res.status(400).send({ success: false, message: countryCodeError });
-      }
-      if (!isValidPhone(phone)) {
-        return res
-          .status(400)
-          .send({ success: false, message: "Invalid Phone Number" });
-      }
+      // const countryCodeError = isValidCountryCode(countryCode);
+      // if (countryCodeError) {
+      //   return res.status(400).send({ success: false, message: countryCodeError });
+      // }
+      // if (!isValidPhone(phone)) {
+      //   return res
+      //     .status(400)
+      //     .send({ success: false, message: "Invalid Phone Number" });
+      // }
       const existingAdmin = await models.Admin.findOne(
         {
           where: {
@@ -171,7 +146,7 @@ class AdminController extends BaseController {
       if (passwordValidationResult) {
         return res.status(400).send({
           success: false,
-          message: passwordValidationResult
+          message: passwordValidationResult,
         });
       }
       const hashedPassword = await bcrypt.hash(password, 10);
@@ -182,7 +157,6 @@ class AdminController extends BaseController {
         {
           name,
           email: email.toLowerCase(),
-          countryCode:countryCode,
           phone,
           password: hashedPassword,
           emailToken,
@@ -210,82 +184,14 @@ class AdminController extends BaseController {
       });
     }
   };
-
-  //   Email OTP verification
-  emailOtpVerification = async (req, res) => {
-    const { email, otp } = req.body;
-    if (!email) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Email is required." });
-    }
-    // Validate the OTP
-    if (!otp) {
-      return res
-        .status(400)
-        .json({ success: false, message: "OTP is required." });
-    }
-
-    try {
-      // Convert email to lowercase before querying
-      const lowercaseEmail = email.toLowerCase().trim();
-
-      const admin = await models.Admin.findOne({
-        where: { email: lowercaseEmail },
-      });
-      console.log(admin);
-      if (!admin) {
-        return res.status(400).json({
-          success: false,
-          message: "Admin not found or invalid details.",
-        });
-      }
-
-      // Check OTP validity
-      if (admin.otp !== otp) {
-        return res.status(400).json({ success: false, message: "Invalid OTP" });
-      }
-      if (admin.otpExpire < Date.now()) {
-        return res
-          .status(400)
-          .json({ success: false, message: "expired OTP." });
-      }
-
-      // Update admin details
-      admin.isEmailVerified = true;
-      admin.otp = null;
-      admin.otpExpire = null;
-      await admin.save();
-
-      res.status(201).json({
-        success: true,
-        message: "Admin data",
-        admin: {
-          id: admin.id,
-          name: admin.name,
-          email: admin.email,
-          phone: admin.phone,
-          isEmailVerified: admin.isEmailVerified,
-        },
-      });
-    } catch (error) {
-      res.status(500).json({
-        success: false,
-        message: "Server Error",
-        error: error.message,
-      });
-    }
-  };
-
+  // signIn of Admin
   signin = async (req, res) => {
     const { email, password } = req.body;
     if ([email, password].some((field) => field?.trim() === "")) {
-      return res
-        .status(400)
-        .send({
-          success: false,
-          message: "Please provide all necessary fields",
-        });
+      return res.status(400).send({
+        success: false,
+        message: "Please provide all necessary fields",
+      });
     }
     if (!email || !password) {
       return res
@@ -334,7 +240,7 @@ class AdminController extends BaseController {
       });
     }
   };
-
+  // Verify email (not in use)
   verifyEmail = async (req, res) => {
     const { token } = req.query;
 
@@ -362,259 +268,72 @@ class AdminController extends BaseController {
       });
     }
   };
-  // forget password
-  forgotPassword = async (req, res) => {
-    const { email } = req.body;
-
-    // Validate input fields
-    if (!email) {
-      return res
-        .status(400)
-        .send({ success: false, message: "Missing email id" });
-    }
-
-    if (!isValidEmail(email)) {
-      return res
-        .status(400)
-        .send({ success: false, message: "Invalid email address" });
-    }
-
-    try {
-      // Find the admin by email
-      const admin = await models.Admin.findOne({
-        where: {
-          email: email.toLowerCase().trim(),
-        },
-      });
-
-      if (!admin) {
-        return res
-          .status(404)
-          .send({ success: false, message: "Admin not found" });
-      }
-      if (!admin.isEmailVerified) {
-        return res
-          .status(400)
-          .send({ success: false, message: "Admin is not verified" });
-      }
-
-      // Get ResetPassword Token
-      const otp = generateOtp(); // Assuming you have a method to generate the OTP
-      admin.otp = otp;
-      admin.otpExpire = Date.now() + 15 * 60 * 1000; // Set OTP expiration time (e.g., 15 minutes)
-
-      await admin.save({ validate: false });
-
-      const message = `Your One Time Password is ${otp}`;
-
-      await sendEmail({
-        email: admin.email,
-        subject: `Password Recovery`,
-        message,
-      });
-
-      res.status(200).json({
-        success: true,
-        message: `OTP sent to ${admin.email} successfully`,
-        adminId: admin.id,
-      });
-    } catch (error) {
-      admin.otp = null;
-      admin.otpExpire = null;
-      await admin.save({ validate: false });
-
-      return res.status(500).send({ success: false, message: error.message });
-    }
-  };
-
-  // reset password
-  resetPassword = async (req, res) => {
-    const { password, otp } = req.body;
-    const adminId = req.params.adminId;
-
-    // Validate input fields
-    if (!password) {
-      return res
-        .status(400)
-        .send({
-          success: false,
-          message: "Missing password",
-        });
-    }
-    if (!otp) {
-      return res
-        .status(400)
-        .send({
-          success: false,
-          message: "Missing OTP",
-        });
-    }
-    if (!adminId) {
-      return res
-        .status(400)
-        .send({ success: false, message: "Missing AdminId in the params" });
-    }
-    const passwordValidationResult = isValidPassword(password);
-    if (passwordValidationResult) {
-      return res.status(400).send({
-        success: false,
-        message: passwordValidationResult
-      });
-    }
-    const hashedPassword = await bcrypt.hash(password, 10);
-    try {
-      // Find the admin by ID
-      const admin = await models.Admin.findByPk(adminId);
-
-      if (!admin) {
-        return res
-          .status(400)
-          .send({ success: false, message: "Admin not found" });
-      }
-
-      // Verify the OTP
-      if (admin.otp !== otp.trim()) {
-        return res.status(400).send({ success: false, message: "Invalid OTP" });
-      }
-      if (admin.otpExpire < Date.now()) {
-        return res.status(400).send({ success: false, message: "expired OTP" });
-      }
-
-      // Update the admin's password and clear OTP fields
-      admin.password = hashedPassword;
-      admin.otp = null;
-      admin.otpExpire = null;
-
-      await admin.save({ validate: true });
-
-      // Exclude password from the response
-      const updatedAdmin = await models.Admin.findByPk(admin.id, {
-        attributes: {
-          exclude: ["password"],
-        },
-      });
-
-      return res.status(200).json({
-        success: true,
-        message: `Password updated for ${updatedAdmin.email}`,
-      });
-    } catch (error) {
-      return res.status(500).send({ success: false, message: error.message });
-    }
-  };
-
-  // send OTP
-  sendOtp = async (req, res) => {
-    const { email } = req.body;
-
-    if (!email) {
-      return res.status(400).send({ success: false, message: "Missing Email" });
-    }
-
-    if (!isValidEmail(email)) {
-      return res.status(400).send({ success: false, message: "Invalid Email" });
-    }
-
-    try {
-      // Convert email to lowercase before querying
-      const lowercaseEmail = email.toLowerCase().trim();
-
-      const admin = await models.Admin.findOne({
-        where: { email: lowercaseEmail },
-      });
-
-      if (!admin) {
-        return res
-          .status(404)
-          .send({ success: false, message: "Admin not found" });
-      }
-
-      const otp = generateOtp();
-      admin.otp = otp;
-      admin.otpExpire = Date.now() + 15 * 60 * 1000;
-
-      await admin.save({ validate: false });
-
-      const message = `Your One Time Password (OTP) is ${otp}`;
-      try {
-        await sendEmail({
-          email: admin.email,
-          subject: `One-Time Password (OTP) for Verification`,
-          message,
-        });
-
-        res.status(200).json({
-          success: true,
-          message: `OTP sent to ${admin.email} successfully`,
-          email: admin.email,
-          adminId: admin.id,
-        });
-      } catch (emailError) {
-        admin.otp = null;
-        admin.otpExpire = null;
-        await admin.save({ validate: false });
-
-        console.error("Failed to send OTP email:", emailError);
-        return res
-          .status(500)
-          .send({ success: false, message: emailError.message });
-      }
-    } catch (error) {
-      return res.status(500).send({ success: false, message: error.message });
-    }
-  };
-
+  //  update Admin
   async updateAdmin(req, res) {
     try {
       const id = req.params.id;
       const { name } = req.body;
-      // Validate name
-      if (name) {
-        const nameError = isValidLength(name);
-        if (nameError) {
-          return res.status(400).send({ success: false, message: nameError });
-        }
-      }
-      
-      // Prepare the update object
-      const updateData = {};
-      if (name && name.trim() !== "") updateData.name = name.trim();
-
-      // Check if any valid field is provided
-      if (Object.keys(updateData).length === 0) {
-        return res.status(400).send({
-          success: false,
-          message: "Please provide valid field to update(name)",
-        });
-      }
-
-      // Update the admin
-      const [updatedRowsCount] = await models.Admin.update(updateData, {
-        where: { id: id }
-      });
-
-      if (updatedRowsCount > 0) {
-        const updatedItem = await this.model.findByPk(id, {
-          attributes: { exclude: ["password"] },
-        });
-
-        if (updatedItem) {
-          res.json({
-            success: true,
-            message: "Admin updated successfully",
-            data: updatedItem,
+  
+      // Validate and sanitize the name
+      if (name && typeof name === 'string' && name.trim() !== '') {
+        const trimmedName = name.trim();
+  
+        // Check if the trimmed name is still non-empty
+        if (trimmedName === '') {
+          return res.status(400).json({
+            success: false,
+            error: 'Name cannot be empty or whitespace.',
           });
+        }
+  
+        // Prepare the update object
+        const updateData = { name: trimmedName };
+  
+        // Validate name length (assuming `isValidLength` is a custom function)
+        const nameError = isValidLength(trimmedName);
+        if (nameError) {
+          return res.status(400).json({ success: false, message: nameError });
+        }
+  
+        // Update the admin
+        const [updatedRowsCount] = await models.Admin.update(updateData, {
+          where: { id: id },
+        });
+  
+        if (updatedRowsCount > 0) {
+          const updatedItem = await models.Admin.findByPk(id, {
+            attributes: { exclude: ['password'] },
+          });
+  
+          if (updatedItem) {
+            return res.json({
+              success: true,
+              message: 'Admin updated successfully',
+              data: updatedItem,
+            });
+          } else {
+            return res.status(404).json({ success: false, error: 'Admin not found after update' });
+          }
         } else {
-          res.status(404).json({ success: false, error: "Admin not found after update" });
+          return res.status(404).json({
+            success: false,
+            error: 'Admin not found or couldn\'t be updated',
+          });
         }
       } else {
-        res.status(404).json({ success: false, error: "Admin not found or couldn't be updated" });
+        return res.status(400).json({
+          success: false,
+          error: 'Name is a required field and cannot be empty or whitespace.',
+        });
       }
     } catch (error) {
       console.error('Update error:', error);
-      res.status(500).json({ success: false, error: "An error occurred while updating the admin" });
+      return res.status(500).json({
+        success: false,
+        error: 'An error occurred while updating the admin',
+      });
     }
-  }
+  }  
 }
 
 module.exports = new AdminController();

@@ -7,7 +7,7 @@ const today = moment();
 
 const isValidEmail = email => validator.isEmail(email);
 
-const isValidPhone = (phone) => validator.isMobilePhone(phone, "en-IN");
+// const isValidPhone = (phone) => validator.isMobilePhone(phone, "en-IN");
 
 const isValidPassword = (password) => {
   if (password.length < 8) {
@@ -65,31 +65,70 @@ const isValidLength = (name) => {
   // }
   return null;  // No errors
 };
-const isValidCountryCode = (countryCode) => {
-  // List of valid country codes (this is a sample, not exhaustive)
-  // const validCodes = ['+1', '+44', '+91', '+86', '+81', '+49', '+33', '+7', '+61', '+55'];
-
-  // Remove any whitespace
-  const cleanCode = countryCode.replace(/\s/g, '');
-
-  if (cleanCode.length === 0) {
-    return { isValid: false, message: "Country code cannot be empty." };
+const isValidDescription = (description) => {
+  if (!description) {
+    return "Description is required";
   }
-
-  if (!cleanCode.startsWith('+')) {
-    return { isValid: false, message: "Country code must start with '+'." };
+  if (/^\d/.test(description)) {
+    return "Description should not start with a number";
   }
-
-  if (!/^\+\d{1,4}$/.test(cleanCode)) {
-    return { isValid: false, message: "Invalid format. Use '+' followed by 1-4 digits." };
+  if (/^[\s]/.test(description)) {
+    return "Description should not start with a space";
   }
-
-  // if (!validCodes.includes(cleanCode)) {
-  //   return { isValid: false, message: "Not a recognized country code." };
-  // }
-
-  return null
+  if (/[^a-zA-Z0-9\s]/.test(description)) {
+    return "Description should only contain letters, numbers, and spaces";
+  }
+  if (/\s{2,}/.test(description)) {
+    return "Description should not contain consecutive spaces";
+  }
+  const words = description.trim().split(/\s+/);
+  if (words.length > 200) {
+    return "Description should be less than 200 words long";
+  }
+  return null;  // No errors
 };
+
+const isValidLocation = (location) => {
+  if (!location) {
+    return "Location is required";
+  }
+  if (/^[\s]/.test(location)) {
+    return "Location should not start with a space";
+  }
+  if (/[^a-zA-Z\s]/.test(location)) {
+    return "Location should only contain letters and spaces";
+  }
+  if (/\s{2,}/.test(location)) {
+    return "Location should not contain consecutive spaces";
+  }
+  return null;  // No errors
+};
+
+// const isValidCountryCode = (countryCode) => {
+//   // List of valid country codes (this is a sample, not exhaustive)
+//   // const validCodes = ['+1', '+44', '+91', '+86', '+81', '+49', '+33', '+7', '+61', '+55'];
+
+//   // Remove any whitespace
+//   const cleanCode = countryCode.replace(/\s/g, '');
+
+//   if (cleanCode.length === 0) {
+//     return { isValid: false, message: "Country code cannot be empty." };
+//   }
+
+//   if (!cleanCode.startsWith('+')) {
+//     return { isValid: false, message: "Country code must start with '+'." };
+//   }
+
+//   if (!/^\+\d{1,4}$/.test(cleanCode)) {
+//     return { isValid: false, message: "Invalid format. Use '+' followed by 1-4 digits." };
+//   }
+
+//   // if (!validCodes.includes(cleanCode)) {
+//   //   return { isValid: false, message: "Not a recognized country code." };
+//   // }
+
+//   return null
+// };
 
 // Function to validate time string
 function isValidTimeString(timeString) {
@@ -136,8 +175,10 @@ function updateDailySlotAvailability(existingSlots, selectedSlots) {
 }
 module.exports = {
   isValidEmail,
-  isValidPhone,
-  isValidCountryCode,
+  isValidDescription,
+  isValidLocation,
+  // isValidPhone,
+  // isValidCountryCode,
   isValidTimeString,
   parseTimeString,
   updateDailySlotAvailability,
