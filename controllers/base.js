@@ -5,7 +5,7 @@ const bcrypt = require("bcrypt");
 // const { Op } = require("sequelize");
 const express = require("express");
 const models = require("../models");
-const { isValidEmail, isValidPassword } = require("../utils/validation");
+const { isValidEmail, isValidPassword,matchesCriteria } = require("../utils/validation");
 const sendEmail = require("../utils/sendEmail.js");
 const {
   authenticate,
@@ -735,110 +735,103 @@ class BaseController {
   // filter oraganization
   async filterOrganization(req, res) {
     try {
-      const { page = 1, limit } = req.query;
-      const { due_date, name } = req.query;
-
-      // Validate page and limit
-      const pageValue = parseInt(page, 10);
-      const limitValue = parseInt(limit, 10);
-
-      if (isNaN(pageValue) || pageValue <= 0) {
-        return res
-          .status(400)
-          .json({ success: false, error: "Invalid page number" });
+      const { name, priority, due_date, page = 1, limit = 10 } = req.query;
+  
+      // Validate pagination parameters
+      const pageNumber = parseInt(page, 10);
+      const limitNumber = parseInt(limit, 10);
+      if (isNaN(pageNumber) || isNaN(limitNumber) || pageNumber < 1 || limitNumber < 1) {
+        return res.status(400).json({ error: 'Invalid pagination parameters' });
       }
-      if (isNaN(limitValue) || limitValue <= 0) {
-        return res
-          .status(400)
-          .json({ success: false, error: "Invalid limit number" });
-      }
-
-      const offset = (pageValue - 1) * limitValue;
-
-      let order = [];
-      let whereClause = {};
-
-      // Validate due_date
-      // if (due_date) {
-      //   if (isNaN(Date.parse(due_date))) {
-      //     return res
-      //       .status(400)
-      //       .json({ success: false, error: "Invalid due date format" });
-      //   }
-      //   order.push(["due_date", "DESC"]);
-      // }
-
-      // Validate name
-      if (name) {
-        if (typeof name !== "string" || name.trim() === "") {
-          return res
-            .status(400)
-            .json({ success: false, error: "Invalid name format" });
-        }
-        order.push(["name", "DESC"]);
-      }
-
-      // Add default ordering
-      order.push(["createdAt", "DESC"]);
-
-      // Define query options
-      const queryOptions = {
-        // where: whereClause,
-        order: order,
-        attributes: { exclude: ["password"] },
-        limit: limitValue,
+  
+      // Calculate offset
+      const offset = (pageNumber - 1) * limitNumber;
+  
+      // Base query
+      let query = {
+        include: [{
+          model: JobPost,
+          as: 'jobPosts',
+          required: false, // Use left outer join
+        }],
+        limit: limitNumber,
         offset: offset,
-        include: [
-          {
-            model: models.JobPost,
-            as: "jobPosts", // Use the correct association alias
-          },
-        ],
+        distinct: true, // Ensure correct count with associations
       };
-
-      // Fetch the filtered results
-      const results = await models.Organization.findAndCountAll(queryOptions);
-
-      // Check if results are empty
-      if (!results.rows.length) {
-        return res.status(404).json({
-          success: false,
-          message: "No matching organizations found",
+  
+      // Check if any filter is applied
+      const isFilterApplied = name || priority || due_date;
+  
+      // Add filters if provided
+      if (isFilterApplied) {
+        if (name) {
+          query.where = {
+            ...query.where,
+            name: {
+              [Op.iLike]: `%${name}%`, // Case-insensitive partial match
+            },
+          };
+        }
+  
+        if (priority || due_date) {
+          query.include[0].where = {};
+  
+          if (priority) {
+            query.include[0].where.status = priority;
+          }
+  
+          if (due_date) {
+            // Validate due_date format
+            if (!/^\d{4}-\d{2}-\d{2}$/.test(due_date)) {
+              return res.status(400).json({ error: 'Invalid due_date format. Use YYYY-MM-DD' });
+            }
+  
+            query.include[0].where.due_date = {
+              [Op.gte]: due_date, // Greater than or equal to the provided date
+            };
+          }
+        }
+      } else {
+        // If no filters are applied, sort by creation date (newest first)
+        query.order = [['createdAt', 'DESC']];
+      }
+  
+      // Fetch organizations with count
+      const { count, rows: organizations } = await models.Organization.findAndCountAll(query);
+  
+      let resultOrganizations = organizations;
+  
+      // Apply custom sorting only if filters are applied
+      if (isFilterApplied) {
+        resultOrganizations = organizations.sort((a, b) => {
+          const aMatch = matchesCriteria(a, name, priority, due_date);
+          const bMatch = matchesCriteria(b, name, priority, due_date);
+  
+          if (aMatch && !bMatch) return -1;
+          if (!aMatch && bMatch) return 1;
+          return a.name.localeCompare(b.name);
         });
       }
-      return console.log(results.rows[0],results.rows[0].jobPosts.jobPost);
-
-      // Filter and sort the results
-      const filteredAndSortedResults = results.rows.sort((a, b) => {
-        const aMatch =
-          (!due_date || a.due_date === due_date) && (!name || a.name === name);
-        const bMatch =
-          (!due_date || b.due_date === due_date) && (!name || b.name === name);
-
-        if (aMatch && !bMatch) return -1;
-        if (!aMatch && bMatch) return 1;
-        return 0;
-      });
-
-      // Apply pagination to the sorted results
-      const paginatedResults = filteredAndSortedResults.slice(
-        offset,
-        offset + limitValue
-      );
-
-      res.status(200).json({
-        success: true,
-        data: paginatedResults,
-        total: results.count,
-        totalPages: Math.ceil(results.count / limitValue),
-        currentPage: pageValue,
+  
+      // Prepare pagination metadata
+      const totalPages = Math.ceil(count / limitNumber);
+      const hasNextPage = pageNumber < totalPages;
+      const hasPrevPage = pageNumber > 1;
+  
+      res.json({
+        organizations: resultOrganizations,
+        pagination: {
+          currentPage: pageNumber,
+          totalPages: totalPages,
+          totalItems: count,
+          itemsPerPage: limitNumber,
+          hasNextPage: hasNextPage,
+          hasPrevPage: hasPrevPage,
+        }
       });
     } catch (error) {
-      console.error("Error in filterOrganization:", error);
-      res.status(500).json({
-        success: false,
-        error: `Internal server error: ${error.message}`,
-      });
+      console.error('Error filtering organizations:', error);
+      res.status(500).json({ error: 'Internal server error' });
     }
   }
   // delete function

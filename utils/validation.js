@@ -121,6 +121,20 @@ const isPhoneValid = (phone) => {
   }
   return null;  // No errors
 };
+const matchesCriteria=(org, name, status, due_date)=> {
+  if (name && !org.name.toLowerCase().includes(name.toLowerCase())) return false;
+  
+  if (status || due_date) {
+    const matchingJob = org.jobPosts.find(job => {
+      if (status && job.status !== status) return false;
+      if (due_date && new Date(job.due_date) < new Date(due_date)) return false;
+      return true;
+    });
+    if (!matchingJob) return false;
+  }
+  
+  return true;
+}
 // const isValidCountryCode = (countryCode) => {
 //   // List of valid country codes (this is a sample, not exhaustive)
 //   // const validCodes = ['+1', '+44', '+91', '+86', '+81', '+49', '+33', '+7', '+61', '+55'];
@@ -195,6 +209,7 @@ module.exports = {
   isValidDescription,
   isValidLocation,
   isPhoneValid,
+  matchesCriteria,
   // isValidCountryCode,
   isValidTimeString,
   parseTimeString,
