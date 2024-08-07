@@ -5,6 +5,7 @@ const models = require("../models");
 const {
   isValidEmail,
   isValidLocation,
+  isPhoneValid,
   isValidDescription,
   isValidPassword,
   isValidLength,
